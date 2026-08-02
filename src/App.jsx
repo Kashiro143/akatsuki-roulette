@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
@@ -15,6 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Synthèse sonore organique et mystique (esprit Akatsuki / sceau de chakra)
 const playSound = (type) => {
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -24,13 +25,13 @@ const playSound = (type) => {
       const gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-      osc.type = type === 'seal' ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(type === 'seal' ? 80 : 50, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(15, audioCtx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.3);
+      osc.stop(audioCtx.currentTime + 0.15);
     } 
     else if (type === 'roulette') {
       const osc = audioCtx.createOscillator();
@@ -38,41 +39,67 @@ const playSound = (type) => {
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(40 + Math.random() * 10, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+      osc.frequency.setValueAtTime(70 + Math.random() * 15, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.08);
+      osc.stop(audioCtx.currentTime + 0.06);
     } 
     else if (type === 'reveal') {
-      const bufferSize = audioCtx.sampleRate * 1.2;
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-      const output = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-      }
-      const whiteNoise = audioCtx.createBufferSource();
-      whiteNoise.buffer = buffer;
-      const filter = audioCtx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(200, audioCtx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.6);
-      
+      const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.4);
-      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
-
-      whiteNoise.connect(filter);
-      filter.connect(gain);
+      osc.connect(gain);
       gain.connect(audioCtx.destination);
-      whiteNoise.start();
-      whiteNoise.stop(audioCtx.currentTime + 1.2);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(25, audioCtx.currentTime + 0.8);
+      
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+    }
+    else if (type === 'boom') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(90, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(18, audioCtx.currentTime + 0.5);
+      gain.gain.setValueAtTime(0.38, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.5);
+
+      const noise = audioCtx.createOscillator();
+      const noiseGain = audioCtx.createGain();
+      noise.connect(noiseGain);
+      noiseGain.connect(audioCtx.destination);
+      noise.type = 'sawtooth';
+      noise.frequency.setValueAtTime(200, audioCtx.currentTime);
+      noise.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+      noiseGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      noiseGain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+      noise.start();
+      noise.stop(audioCtx.currentTime + 0.2);
     }
   } catch (e) {
-    // Audio bloqué
+    // Audio bloqué par le navigateur
   }
 };
+
+// Silhouette de nuage façon Akatsuki (rouge cerclé de noir), purement décorative
+const AkatsukiCloud = ({ style }) => (
+  <svg viewBox="0 0 100 60" style={style} xmlns="http://www.w3.org/2000/svg">
+    <g>
+      <ellipse cx="30" cy="36" rx="24" ry="17" fill="#7f1d1d" stroke="#000" strokeWidth="2.5" />
+      <ellipse cx="54" cy="24" rx="19" ry="15" fill="#7f1d1d" stroke="#000" strokeWidth="2.5" />
+      <ellipse cx="73" cy="37" rx="17" ry="13" fill="#7f1d1d" stroke="#000" strokeWidth="2.5" />
+      <ellipse cx="46" cy="42" rx="30" ry="15" fill="#7f1d1d" stroke="#000" strokeWidth="2.5" />
+    </g>
+  </svg>
+);
 
 const questions = [
   {
@@ -147,12 +174,13 @@ export default function App() {
   const [assignedRing, setAssignedRing] = useState(null);
   const [isRolling, setIsRolling] = useState(false);
   const [rollingText, setRollingText] = useState('Recherche dans le flux...');
-  
-  // États animations & Galerie
-  const [isBreaking, setIsBreaking] = useState(false);
+
   const [isQuizFadingIn, setIsQuizFadingIn] = useState(false);
   const [isResultFadingIn, setIsResultFadingIn] = useState(false);
   const [isRouletteFadingIn, setIsRouletteFadingIn] = useState(false);
+  const [rouletteCounter, setRouletteCounter] = useState(0);
+  const [isRouletteFinalizing, setIsRouletteFinalizing] = useState(false);
+  const [isGalleryFadingIn, setIsGalleryFadingIn] = useState(false);
   
   const [selectedGalleryRing, setSelectedGalleryRing] = useState(null); 
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -165,6 +193,14 @@ export default function App() {
   const [adminError, setAdminError] = useState(false);
   const [editingRingId, setEditingRingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', kanji: '', owner: '', description: '', history: '' });
+
+  // Rituel de bris du sceau (étape "sealed")
+  const [sealProgress, setSealProgress] = useState(0);
+  const [isSealBroken, setIsSealBroken] = useState(false);
+  const [isSealHolding, setIsSealHolding] = useState(false);
+  const sealHoldInterval = useRef(null);
+  const sealDecayInterval = useRef(null);
+  const sealRumbleRef = useRef(null);
 
   const fetchRings = async () => {
     try {
@@ -240,21 +276,115 @@ export default function App() {
     setStep('sealed');
   };
 
-  const handleBreakSeal = () => {
-    if (isBreaking) return;
-    playSound('seal');
-    setIsBreaking(true);
+  const startSealRumble = () => {
+    if (sealRumbleRef.current) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(42, ctx.currentTime);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      sealRumbleRef.current = { ctx, osc, gain };
+    } catch (e) {
+      // Audio bloqué par le navigateur
+    }
+  };
 
-    setTimeout(() => {
-      if (availableRings.length === 0) {
-        setStep('finished');
-        setTimeout(() => setIsResultFadingIn(true), 50);
-      } else {
-        setStep('quiz');
-        setIsBreaking(false);
-        setTimeout(() => setIsQuizFadingIn(true), 50);
-      }
-    }, 700);
+  const updateSealRumble = (progress) => {
+    const r = sealRumbleRef.current;
+    if (!r) return;
+    try {
+      const now = r.ctx.currentTime;
+      r.osc.frequency.linearRampToValueAtTime(42 + progress * 1.1, now + 0.05);
+      r.gain.gain.linearRampToValueAtTime(0.04 + (progress / 100) * 0.09, now + 0.05);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const stopSealRumble = (immediate) => {
+    const r = sealRumbleRef.current;
+    if (!r) return;
+    try {
+      const now = r.ctx.currentTime;
+      r.gain.gain.cancelScheduledValues(now);
+      r.gain.gain.setValueAtTime(r.gain.gain.value, now);
+      r.gain.gain.linearRampToValueAtTime(0.0001, now + (immediate ? 0.15 : 0.4));
+      r.osc.stop(now + (immediate ? 0.2 : 0.45));
+    } catch (e) {
+      // ignore
+    }
+    sealRumbleRef.current = null;
+  };
+
+  const startBreakingSeal = () => {
+    if (isSealBroken || sealHoldInterval.current) return;
+    if (sealDecayInterval.current) {
+      clearInterval(sealDecayInterval.current);
+      sealDecayInterval.current = null;
+    }
+    setIsSealHolding(true);
+    startSealRumble();
+    sealHoldInterval.current = setInterval(() => {
+      setSealProgress((prev) => {
+        const next = Math.min(prev + 2.2, 100);
+        updateSealRumble(next);
+        if (Math.floor(next / 14) > Math.floor(prev / 14)) {
+          playSound('seal');
+          if (navigator.vibrate) navigator.vibrate(8);
+        }
+        if (next >= 100) {
+          clearInterval(sealHoldInterval.current);
+          sealHoldInterval.current = null;
+          setIsSealHolding(false);
+          setIsSealBroken(true);
+          stopSealRumble(true);
+          playSound('boom');
+          if (navigator.vibrate) navigator.vibrate([25, 30, 55]);
+          setTimeout(() => proceedToQuiz(), 950);
+        }
+        return next;
+      });
+    }, 35);
+  };
+
+  const stopBreakingSeal = () => {
+    if (sealHoldInterval.current) {
+      clearInterval(sealHoldInterval.current);
+      sealHoldInterval.current = null;
+    }
+    setIsSealHolding(false);
+    if (!isSealBroken) {
+      stopSealRumble(false);
+      sealDecayInterval.current = setInterval(() => {
+        setSealProgress((prev) => {
+          const next = Math.max(prev - 3, 0);
+          if (next <= 0 && sealDecayInterval.current) {
+            clearInterval(sealDecayInterval.current);
+            sealDecayInterval.current = null;
+          }
+          return next;
+        });
+      }, 30);
+    }
+  };
+
+  // Passage direct sans mini-jeu ni cercle de chargement
+  const proceedToQuiz = () => {
+    playSound('reveal');
+    if (availableRings.length === 0) {
+      setStep('finished');
+      setTimeout(() => setIsResultFadingIn(true), 50);
+    } else {
+      setStep('quiz');
+      setTimeout(() => setIsQuizFadingIn(true), 50);
+    }
   };
 
   const handleAnswer = (trait) => {
@@ -272,9 +402,18 @@ export default function App() {
     }
   };
 
+  const openGallery = () => {
+    playSound('click');
+    setIsGalleryFadingIn(false);
+    setStep('gallery-fullscreen');
+    setTimeout(() => setIsGalleryFadingIn(true), 50);
+  };
+
   const startRoulette = (finalAnswers) => {
     setStep('roulette');
     setIsRouletteFadingIn(false);
+    setRouletteCounter(0);
+    setIsRouletteFinalizing(false);
     setTimeout(() => setIsRouletteFadingIn(true), 50);
     setIsRolling(true);
     let counter = 0;
@@ -283,25 +422,25 @@ export default function App() {
       const randomRing = availableRings[Math.floor(Math.random() * availableRings.length)];
       setRollingText(`${randomRing.kanji} — ${randomRing.name}`);
       counter++;
+      setRouletteCounter(counter);
       if (counter > 30) {
         clearInterval(interval);
-        finalizeRingAssignment(finalAnswers);
+        setIsRouletteFinalizing(true);
+        playSound('boom');
+        if (navigator.vibrate) navigator.vibrate([20, 25, 40]);
+        setTimeout(() => finalizeRingAssignment(finalAnswers), 550);
       }
     }, 70);
   };
 
   const finalizeRingAssignment = (finalAnswers) => {
-    // Analyse optionnelle des traits dominants pour orienter l'attribution
     const traitCounts = finalAnswers.reduce((acc, t) => {
       acc[t] = (acc[t] || 0) + 1;
       return acc;
     }, {});
     
-    // On trouve le trait dominant
     const dominantTrait = Object.keys(traitCounts).reduce((a, b) => traitCounts[a] > traitCounts[b] ? a : b, 'pain');
 
-    // Filtrer les bagues par correspondance de trait si possible, sinon piocher dans le reste disponible
-    // (Ici on garde une sélection pondérée par affinité ou aléatoire parmi les disponibles)
     const selected = availableRings[Math.floor(Math.random() * availableRings.length)];
     
     setAssignedRing(selected);
@@ -365,6 +504,42 @@ export default function App() {
     }
   };
 
+  // Tracés SVG des fissures du sceau, irradiant depuis le centre (75,75)
+  const crackPaths = [
+    "M75,75 L68,50 L72,35 L60,18",
+    "M75,75 L95,55 L88,38 L100,20",
+    "M75,75 L100,80 L120,75 L135,68",
+    "M75,75 L100,95 L118,105 L132,120",
+    "M75,75 L80,105 L70,120 L78,140",
+    "M75,75 L55,100 L45,115 L28,125",
+    "M75,75 L50,80 L28,75 L12,80",
+    "M75,75 L55,60 L35,55 L18,42",
+    "M75,75 L65,90 L45,95 L30,105",
+  ];
+
+  // Particules générées au moment de la rupture du sceau (étincelles + éclats)
+  const shatterParticles = useMemo(() => {
+    if (!isSealBroken) return [];
+    return Array.from({ length: 22 }, (_, i) => {
+      const angle = (i / 22) * Math.PI * 2 + Math.random() * 0.3;
+      const distance = 90 + Math.random() * 90;
+      const isShard = i % 3 === 0;
+      return {
+        id: i,
+        x: Math.cos(angle) * distance,
+        y: Math.sin(angle) * distance,
+        delay: Math.random() * 0.15,
+        size: isShard ? 7 + Math.random() * 7 : 3 + Math.random() * 4,
+        rotate: Math.random() * 360,
+        shard: isShard,
+      };
+    });
+  }, [isSealBroken]);
+
+  // Tremblement croissant pendant le maintien de la pression sur le sceau
+  const sealJitterX = isSealHolding ? (Math.random() - 0.5) * (sealProgress / 100) * 10 : 0;
+  const sealJitterY = isSealHolding ? (Math.random() - 0.5) * (sealProgress / 100) * 10 : 0;
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflowX: 'hidden', boxSizing: 'border-box', padding: '30px 20px', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
@@ -401,7 +576,7 @@ export default function App() {
       {/* Bouton pour accéder au Cercle des Détenteurs depuis la Cover */}
       {step === 'cover' && (
         <button
-          onClick={() => { playSound('click'); setStep('gallery-fullscreen'); }}
+          onClick={openGallery}
           style={{
             position: 'fixed',
             top: '20px',
@@ -416,24 +591,33 @@ export default function App() {
             letterSpacing: '2px',
             cursor: 'pointer',
             zIndex: 10,
-            backdropFilter: 'blur(5px)'
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '7px'
           }}
         >
-          ☁️ Cercle des Détenteurs
+          <AkatsukiCloud style={{ width: '16px', height: 'auto' }} />
+          Cercle des Détenteurs
         </button>
       )}
 
-            {/* Arrière-plan général */}
-<div style={{
-  position: 'fixed',
-  inset: 0,
-  backgroundImage: `linear-gradient(rgba(5, 5, 7, 0.82), rgba(5, 5, 7, 0.96)), url("${import.meta.env.BASE_URL}background.jpg")`,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  zIndex: 0
-}}></div>
+      {/* Arrière-plan général */}
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundImage: `linear-gradient(rgba(5, 5, 7, 0.82), rgba(5, 5, 7, 0.96)), url("${import.meta.env.BASE_URL}background.jpg")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        zIndex: 0
+      }}></div>
 
-      
+      {/* Brume mystique ambiante, sur toutes les étapes */}
+      <div className="smoke-container">
+        <div className="smoke-puff smoke-1"></div>
+        <div className="smoke-puff smoke-2"></div>
+        <div className="smoke-puff smoke-3"></div>
+      </div>
 
       <div style={{ zIndex: 2 }}></div>
 
@@ -449,7 +633,6 @@ export default function App() {
           padding: '20px',
           boxSizing: 'border-box'
         }}>
-          {/* Header de la vue plein écran */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexShrink: 0 }}>
             <button 
               onClick={() => { playSound('click'); setStep(assignedRing ? 'result' : (availableRings.length === 0 ? 'finished' : 'cover')); setSelectedGalleryRing(null); }}
@@ -463,7 +646,6 @@ export default function App() {
             <div style={{ width: '120px' }}></div>
           </div>
 
-          {/* Accordéon occupant tout l'espace restant */}
           <div style={{ 
             display: 'flex', 
             flexDirection: 'row', 
@@ -476,6 +658,7 @@ export default function App() {
             {allRings.map((ring, index) => {
               const isSelected = selectedGalleryRing?.id === ring.id;
               const isHovered = hoveredIndex === index && !selectedGalleryRing;
+              const isFree = !ring.assignedTo;
               
               let flexValue = '1';
               if (selectedGalleryRing) {
@@ -496,17 +679,32 @@ export default function App() {
                     flex: flexValue,
                     height: '100%',
                     background: 'rgba(10, 10, 14, 0.9)',
-                    border: `1px solid ${isSelected ? '#ef4444' : isHovered ? 'rgba(239, 68, 68, 0.6)' : 'rgba(82, 82, 91, 0.25)'}`,
+                    border: `1px solid ${isSelected ? '#ef4444' : isHovered ? 'rgba(239, 68, 68, 0.6)' : isFree ? 'rgba(82, 82, 91, 0.4)' : 'rgba(82, 82, 91, 0.25)'}`,
+                    borderStyle: isFree && !isSelected && !isHovered ? 'dashed' : 'solid',
                     borderRadius: '6px',
                     overflow: 'hidden',
                     position: 'relative',
                     cursor: 'pointer',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    opacity: isGalleryFadingIn ? 1 : 0,
+                    transform: isGalleryFadingIn ? 'translateY(0)' : 'translateY(24px)',
+                    transition: `opacity 0.5s ease ${index * 0.04}s, transform 0.5s ease ${index * 0.04}s, flex 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s ease, box-shadow 0.4s ease`,
                     display: 'flex',
                     flexDirection: isSelected ? 'row' : 'column',
                     boxShadow: isSelected ? '0 0 45px rgba(239, 68, 68, 0.45)' : isHovered ? '0 0 20px rgba(239, 68, 68, 0.2)' : 'none'
                   }}
                 >
+                  {isFree && !isSelected && (
+                    <span style={{
+                      position: 'absolute', top: '8px', right: '8px', zIndex: 3,
+                      background: 'rgba(5, 5, 7, 0.75)', border: '1px solid rgba(161, 161, 170, 0.5)',
+                      color: '#a1a1aa', fontSize: '8px', letterSpacing: '1.5px', textTransform: 'uppercase',
+                      padding: '3px 7px', borderRadius: '10px', fontFamily: 'monospace',
+                      animation: 'freeRingPulse 2.4s ease-in-out infinite'
+                    }}>
+                      Libre
+                    </span>
+                  )}
+
                   <div style={{
                     position: 'relative',
                     width: isSelected ? '45%' : '100%',
@@ -514,6 +712,7 @@ export default function App() {
                     backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
+                    filter: isFree && !isSelected ? 'grayscale(0.75) brightness(0.55)' : 'none',
                     transition: 'all 0.4s ease'
                   }}>
                     <div style={{
@@ -536,19 +735,26 @@ export default function App() {
                         flexDirection: 'column',
                         gap: '2px'
                       }}>
-                        <span style={{ color: '#ef4444', fontSize: 'clamp(16px, 2vw, 22px)', fontFamily: '"Yuji Boku", serif', display: 'block', textShadow: '0 0 10px rgba(239,68,68,0.5)' }}>
+                        <span style={{ color: isFree ? '#a1a1aa' : '#ef4444', fontSize: 'clamp(16px, 2vw, 22px)', fontFamily: '"Yuji Boku", serif', display: 'block', textShadow: isFree ? 'none' : '0 0 10px rgba(239,68,68,0.5)' }}>
                           {ring.kanji}
                         </span>
                         
-                        {/* Affichage du porteur actuel avec le nom du porteur initial en dessous en italique */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                          <span style={{ color: '#f4f4f5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', maxWidth: '90%' }}>
-                            {activeHolder}
-                          </span>
-                          {ring.owner && ring.owner !== activeHolder && (
-                            <span style={{ color: '#a1a1aa', fontSize: '9px', fontStyle: 'italic', letterSpacing: '0.5px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>
-                              {ring.owner}
+                          {isFree ? (
+                            <span style={{ color: '#71717a', fontSize: '10px', fontStyle: 'italic', letterSpacing: '1px' }}>
+                              En attente d'un porteur
                             </span>
+                          ) : (
+                            <>
+                              <span style={{ color: '#f4f4f5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', maxWidth: '90%' }}>
+                                {activeHolder}
+                              </span>
+                              {ring.owner && ring.owner !== activeHolder && (
+                                <span style={{ color: '#a1a1aa', fontSize: '9px', fontStyle: 'italic', letterSpacing: '0.5px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>
+                                  {ring.owner}
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -579,9 +785,15 @@ export default function App() {
                         <div>
                           <span style={{ fontSize: '10px', color: '#71717a', textTransform: 'uppercase', fontFamily: 'monospace', letterSpacing: '2px' }}>Porteur Actuel</span>
                           <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <p style={{ color: '#f87171', fontSize: '16px', margin: 0, fontWeight: 'bold' }}>
-                              👤 {activeHolder}
-                            </p>
+                            {isFree ? (
+                              <p style={{ color: '#a1a1aa', fontSize: '15px', margin: 0, fontStyle: 'italic' }}>
+                                ⛓️ Bague libre — en attente d'un porteur
+                              </p>
+                            ) : (
+                              <p style={{ color: '#f87171', fontSize: '16px', margin: 0, fontWeight: 'bold' }}>
+                                👤 {activeHolder}
+                              </p>
+                            )}
                             {ring.owner && ring.owner !== activeHolder && (
                               <p style={{ color: '#a1a1aa', fontSize: '11px', fontStyle: 'italic', margin: 0, opacity: 0.9, letterSpacing: '0.5px' }}>
                                 Porteur initial originel : <span style={{ color: '#d4d4d8' }}>{ring.owner}</span>
@@ -646,9 +858,13 @@ export default function App() {
         {step === 'cover' && (
           <div 
             onClick={handleOpenNameInput}
-            style={{ textAlign: 'center', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%', padding: '40px' }}
+            style={{ textAlign: 'center', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', width: '100%', padding: '40px' }}
           >
-            <div style={{ fontSize: '54px', textShadow: '0 0 25px rgba(239, 68, 68, 0.5)' }}>☁️</div>
+            <AkatsukiCloud style={{
+              width: 'clamp(90px, 22vw, 130px)', height: 'auto',
+              filter: 'drop-shadow(0 0 22px rgba(239, 68, 68, 0.5))',
+              animation: 'coverCloudBreathe 4s ease-in-out infinite'
+            }} />
             <div style={{ color: '#a1a1aa', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '4px', opacity: 0.8, fontWeight: '500' }}>
               Toucher pour éveiller le rituel
             </div>
@@ -691,37 +907,147 @@ export default function App() {
           </form>
         )}
 
-        {/* ÉTAPE 3 : Sceau */}
+        {/* ÉTAPE 3 : Rituel de bris du sceau */}
         {step === 'sealed' && (
-          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '25px' }}>
-            <div style={{ fontSize: '56px', textShadow: '0 0 20px rgba(239, 68, 68, 0.6)' }}>💍</div>
+          <div style={{
+            textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', width: '100%',
+            transform: isSealHolding ? `translate(${sealJitterX}px, ${sealJitterY}px)` : 'none',
+            animation: isSealBroken ? 'sealBreakShake 0.55s ease-out' : 'none'
+          }}>
+            
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <h3 style={{ color: '#ef4444', fontSize: '32px', margin: 0, fontFamily: '"Yuji Boku", serif', textShadow: '0 0 20px rgba(239, 68, 68, 0.6)' }}>{playerName}</h3>
-              <p style={{ color: '#d4d4d8', fontSize: '14px', maxWidth: '360px', margin: 0, lineHeight: '1.6', fontWeight: '400' }}>
-                Le sceau spirituel est établi. Brisez-le pour faire face à votre épreuve.
+              <h3 style={{ color: '#ef4444', fontSize: '28px', margin: 0, fontFamily: '"Yuji Boku", serif', textShadow: '0 0 20px rgba(239, 68, 68, 0.6)' }}>{playerName}</h3>
+              <p style={{ color: '#d4d4d8', fontSize: '13px', maxWidth: '380px', margin: '0 auto', lineHeight: '1.6', fontWeight: '400' }}>
+                {isSealBroken
+                  ? "Le sceau se brise. Ta véritable nature va être révélée..."
+                  : sealProgress > 0
+                    ? "Le sceau frémit sous ta volonté. Ne relâche pas..."
+                    : "Un sceau interdit retient ton destin. Maintiens ta pression pour le briser."}
               </p>
             </div>
-            <button
-              onClick={handleBreakSeal}
-              style={{ 
-                background: isBreaking ? '#7f1d1d' : '#991b1b', 
-                color: '#fff', 
-                border: '1px solid #ef4444', 
-                padding: '14px 32px', 
-                borderRadius: '4px', 
-                fontWeight: '600', 
-                textTransform: 'uppercase', 
-                letterSpacing: '2px', 
-                fontSize: '12px', 
-                cursor: 'pointer', 
-                boxShadow: isBreaking ? '0 0 45px rgba(239, 68, 68, 0.9)' : '0 0 25px rgba(153, 27, 27, 0.7)', 
-                transform: isBreaking ? 'scale(1.1) rotate(1deg)' : 'scale(1)',
-                transition: 'all 0.3s ease', 
-                marginTop: '10px' 
-              }}
-            >
-              {isBreaking ? 'Sceau en rupture...' : 'Briser le Sceau'}
-            </button>
+
+            <div style={{ position: 'relative', width: 'clamp(240px, 70vw, 340px)', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+              {/* Nuages rouges façon Akatsuki, ambiance décorative */}
+              <AkatsukiCloud style={{
+                position: 'absolute', top: '-8%', left: '-14%', width: '46%', height: 'auto', opacity: isSealBroken ? 0 : 0.4,
+                animation: 'cloudDrift 9s ease-in-out infinite', transition: 'opacity 0.5s ease', filter: 'blur(0.3px)'
+              }} />
+              <AkatsukiCloud style={{
+                position: 'absolute', bottom: '-6%', right: '-16%', width: '40%', height: 'auto', opacity: isSealBroken ? 0 : 0.35,
+                animation: 'cloudDrift 11s ease-in-out infinite reverse', transition: 'opacity 0.5s ease', filter: 'blur(0.3px)'
+              }} />
+
+              {/* Flash de rupture, plein écran (cœur blanc vers halo rouge) */}
+              {isSealBroken && (
+                <div style={{
+                  position: 'fixed', inset: 0, zIndex: 5, pointerEvents: 'none',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(239,68,68,0.55) 35%, rgba(239,68,68,0) 68%)',
+                  animation: 'sealFlash 0.7s ease-out forwards'
+                }} />
+              )}
+
+              {/* Onde de choc double, expansion rapide */}
+              {isSealBroken && (
+                <>
+                  <div style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '2px solid rgba(239,68,68,0.85)', animation: 'shockwaveExpand 0.9s ease-out forwards' }} />
+                  <div style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '2px solid rgba(252,165,165,0.6)', animation: 'shockwaveExpand 0.9s ease-out 0.12s forwards' }} />
+                </>
+              )}
+
+              {/* Éclats et étincelles projetés lors de la rupture */}
+              {shatterParticles.map((p) => (
+                <div key={p.id} style={{
+                  position: 'absolute', top: '50%', left: '50%',
+                  width: `${p.size}px`,
+                  height: p.shard ? `${p.size * 0.35}px` : `${p.size}px`,
+                  background: p.shard ? 'linear-gradient(90deg, #fca5a5, #991b1b)' : '#ef4444',
+                  borderRadius: p.shard ? '2px' : '50%',
+                  boxShadow: '0 0 8px 2px rgba(239,68,68,0.8)',
+                  '--tx': `${p.x}px`, '--ty': `${p.y}px`, '--r': `${p.rotate}deg`,
+                  animation: `shatterFly 0.9s ease-out ${p.delay}s forwards`,
+                  opacity: 0, pointerEvents: 'none'
+                }} />
+              ))}
+
+              {/* Anneau de runes rotatif, accélère avec la pression */}
+              <svg width="100%" height="100%" viewBox="0 0 210 210" style={{
+                position: 'absolute',
+                opacity: isSealBroken ? 0 : 0.55,
+                animation: `sealRotateRing ${8 - (sealProgress / 100) * 6}s linear infinite`,
+                transition: 'opacity 0.5s ease'
+              }}>
+                {Array.from({ length: 16 }).map((_, i) => (
+                  <rect key={i} x="103" y="4" width="4" height="14" rx="1" fill="#ef4444" opacity={0.55}
+                    transform={`rotate(${(i / 16) * 360} 105 105)`} />
+                ))}
+              </svg>
+
+              {/* Cercle de progression du maintien */}
+              <svg width="85.7%" height="85.7%" viewBox="0 0 180 180" style={{
+                position: 'absolute', transform: 'rotate(-90deg)',
+                opacity: isSealBroken ? 0 : 1, transition: 'opacity 0.4s ease'
+              }}>
+                <circle cx="90" cy="90" r="82" fill="none" stroke="#27272a" strokeWidth="2" />
+                <circle
+                  cx="90" cy="90" r="82" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 82}
+                  strokeDashoffset={2 * Math.PI * 82 * (1 - sealProgress / 100)}
+                  style={{ filter: 'drop-shadow(0 0 6px rgba(239,68,68,0.8))', transition: 'stroke-dashoffset 0.05s linear' }}
+                />
+              </svg>
+
+              {/* Sceau central : zone de pression + fissures progressives + kanji imposant */}
+              <div
+                onMouseDown={startBreakingSeal}
+                onMouseUp={stopBreakingSeal}
+                onMouseLeave={stopBreakingSeal}
+                onTouchStart={(e) => { e.preventDefault(); startBreakingSeal(); }}
+                onTouchEnd={stopBreakingSeal}
+                style={{
+                  width: '71.4%', height: '71.4%', borderRadius: '50%', position: 'relative',
+                  background: 'radial-gradient(circle, rgba(24,24,27,0.9) 0%, rgba(10,10,14,0.95) 70%)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: isSealBroken ? 'default' : 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent',
+                  transform: isSealBroken ? 'scale(1.5)' : `scale(${1 + sealProgress / 400})`,
+                  opacity: isSealBroken ? 0 : 1,
+                  transition: isSealBroken ? 'transform 0.65s ease-out, opacity 0.65s ease-out 0.1s' : 'transform 0.1s ease'
+                }}
+              >
+                <svg width="100%" height="100%" viewBox="0 0 150 150" style={{ position: 'absolute', top: 0, left: 0 }}>
+                  {crackPaths.map((d, i) => {
+                    const threshold = i * 11;
+                    const reveal = Math.max(0, Math.min(1, (sealProgress - threshold) / 18));
+                    return (
+                      <path key={i} d={d} fill="none" stroke="#fca5a5" strokeWidth="1.2"
+                        style={{ opacity: reveal, filter: 'drop-shadow(0 0 3px rgba(239,68,68,0.9))' }}
+                      />
+                    );
+                  })}
+                </svg>
+
+                <span style={{
+                  fontFamily: '"Yuji Boku", serif',
+                  fontSize: 'clamp(60px, 17vw, 96px)',
+                  color: '#ef4444',
+                  lineHeight: 1,
+                  textShadow: isSealBroken
+                    ? '0 0 45px rgba(255,255,255,0.9), 0 0 80px rgba(239,68,68,0.9)'
+                    : undefined,
+                  animation: isSealBroken ? 'none' : 'sealPulseCore 2s ease-in-out infinite'
+                }}>
+                  封
+                </span>
+              </div>
+            </div>
+
+            <span style={{
+              color: '#52525b', fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'monospace',
+              opacity: isSealBroken ? 0 : 1, transition: 'opacity 0.3s ease'
+            }}>
+              {sealProgress < 100 ? 'Presser et maintenir' : 'Sceau rompu'}
+            </span>
           </div>
         )}
 
@@ -794,7 +1120,7 @@ export default function App() {
             flexDirection: 'column', 
             alignItems: 'center', 
             textAlign: 'center', 
-            gap: '35px',
+            gap: '30px',
             opacity: isRouletteFadingIn ? 1 : 0,
             transform: isRouletteFadingIn ? 'translateY(0)' : 'translateY(15px)',
             transition: 'opacity 0.6s ease-out, transform 0.6s ease-out'
@@ -808,8 +1134,50 @@ export default function App() {
               </h2>
             </div>
 
-            <div style={{ color: '#ef4444', fontSize: 'clamp(24px, 5vw, 36px)', fontFamily: '"Yuji Boku", serif', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', textShadow: '0 0 25px rgba(239, 68, 68, 0.7)' }}>
-              {rollingText}
+            <div style={{ position: 'relative', width: 'clamp(220px, 60vw, 300px)', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+              {/* Flash de verdict quand la roulette s'arrête */}
+              {isRouletteFinalizing && (
+                <div style={{
+                  position: 'fixed', inset: 0, zIndex: 5, pointerEvents: 'none',
+                  background: 'radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(239,68,68,0.5) 35%, rgba(239,68,68,0) 68%)',
+                  animation: 'sealFlash 0.55s ease-out forwards'
+                }} />
+              )}
+
+              {/* Anneau de runes, accélère à mesure que le tirage progresse */}
+              <svg width="100%" height="100%" viewBox="0 0 210 210" style={{
+                position: 'absolute',
+                opacity: isRouletteFinalizing ? 0 : 0.55,
+                animation: `sealRotateRing ${Math.max(2.5 - (rouletteCounter / 30) * 1.8, 0.7)}s linear infinite`,
+                transition: 'opacity 0.4s ease'
+              }}>
+                {Array.from({ length: 16 }).map((_, i) => (
+                  <rect key={i} x="103" y="4" width="4" height="14" rx="1" fill="#ef4444" opacity={0.55}
+                    transform={`rotate(${(i / 16) * 360} 105 105)`} />
+                ))}
+              </svg>
+
+              {/* Cercle qui se referme à mesure qu'on approche du verdict */}
+              <svg width="80%" height="80%" viewBox="0 0 180 180" style={{ position: 'absolute', transform: 'rotate(-90deg)' }}>
+                <circle cx="90" cy="90" r="82" fill="none" stroke="#27272a" strokeWidth="2" />
+                <circle
+                  cx="90" cy="90" r="82" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 82}
+                  strokeDashoffset={2 * Math.PI * 82 * (1 - Math.min(rouletteCounter / 30, 1))}
+                  style={{ filter: 'drop-shadow(0 0 6px rgba(239,68,68,0.8))', transition: 'stroke-dashoffset 0.06s linear' }}
+                />
+              </svg>
+
+              <div key={rollingText} style={{
+                color: '#ef4444', fontSize: 'clamp(20px, 4.2vw, 30px)', fontFamily: '"Yuji Boku", serif',
+                padding: '0 12px', textShadow: '0 0 25px rgba(239, 68, 68, 0.7)',
+                animation: isRouletteFinalizing ? 'none' : 'rouletteTextFlicker 0.12s ease-out',
+                transform: isRouletteFinalizing ? 'scale(1.15)' : 'scale(1)',
+                transition: 'transform 0.3s ease-out'
+              }}>
+                {rollingText}
+              </div>
             </div>
 
             <span style={{ color: '#52525b', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'monospace' }}>
@@ -831,13 +1199,33 @@ export default function App() {
             transform: isResultFadingIn ? 'translateY(0)' : 'translateY(15px)',
             transition: 'opacity 0.6s ease-out, transform 0.6s ease-out'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative' }}>
               <span style={{ color: '#71717a', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '3px', fontFamily: 'monospace' }}>
                 Bague Attribuée
               </span>
-              <h2 style={{ color: '#ef4444', fontSize: 'clamp(28px, 6vw, 42px)', fontFamily: '"Yuji Boku", serif', margin: 0, textShadow: '0 0 20px rgba(239, 68, 68, 0.6)' }}>
-                {assignedRing.kanji} — {assignedRing.name}
-              </h2>
+
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                  position: 'absolute', width: '220px', height: '220px', borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(239,68,68,0.35) 0%, rgba(239,68,68,0) 70%)',
+                  animation: 'resultBurst 1s ease-out', pointerEvents: 'none'
+                }} />
+                <AkatsukiCloud style={{
+                  position: 'absolute', top: '-30px', left: '-45px', width: '60px', height: 'auto',
+                  opacity: 0.3, animation: 'cloudDrift 10s ease-in-out infinite'
+                }} />
+                <AkatsukiCloud style={{
+                  position: 'absolute', bottom: '-24px', right: '-50px', width: '55px', height: 'auto',
+                  opacity: 0.28, animation: 'cloudDrift 12s ease-in-out infinite reverse'
+                }} />
+                <h2 style={{
+                  color: '#ef4444', fontSize: 'clamp(28px, 6vw, 42px)', fontFamily: '"Yuji Boku", serif', margin: 0,
+                  textShadow: '0 0 20px rgba(239, 68, 68, 0.6)', position: 'relative',
+                  animation: 'resultKanjiReveal 0.9s ease-out'
+                }}>
+                  {assignedRing.kanji} — {assignedRing.name}
+                </h2>
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '480px', width: '100%' }}>
@@ -874,9 +1262,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Bouton pour aller voir le cercle après obtention */}
             <button
-              onClick={() => { playSound('click'); setStep('gallery-fullscreen'); }}
+              onClick={openGallery}
               style={{
                 background: 'rgba(153, 27, 27, 0.3)',
                 border: '1px solid rgba(239, 68, 68, 0.6)',
@@ -909,7 +1296,7 @@ export default function App() {
             </p>
             
             <button
-              onClick={() => { playSound('click'); setStep('gallery-fullscreen'); }}
+              onClick={openGallery}
               style={{
                 background: 'rgba(153, 27, 27, 0.3)',
                 border: '1px solid rgba(239, 68, 68, 0.6)',
