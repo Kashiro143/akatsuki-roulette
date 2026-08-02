@@ -1,0 +1,58 @@
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #050507;
+  color: #f4f4f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Effet de fumée/brume mystique et subtil */
+.smoke-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+  opacity: 0.45;
+}
+
+.smoke-puff {
+  position: absolute;
+  background: radial-gradient(circle, rgba(120, 113, 108, 0.15) 0%, rgba(24, 24, 27, 0.05) 50%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: floatSmoke 18s infinite linear;
+}
+
+.smoke-1 { width: 500px; height: 500px; top: -10%; left: -10%; animation-duration: 22s; }
+.smoke-2 { width: 600px; height: 600px; bottom: -20%; right: -10%; animation-duration: 28s; animation-direction: reverse; }
+.smoke-3 { width: 400px; height: 400px; top: 30%; left: 40%; animation-duration: 16s; }
+
+@keyframes floatSmoke {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.2; }
+  50% { transform: translate(40px, -50px) scale(1.2); opacity: 0.4; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.2; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.4)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(239, 68, 68, 0.8)); }
+}
+
+input[type="text"], input[type="password"] {
+  width: 100%;
+  background: rgba(10, 10, 14, 0.8);
+  border: 1px solid #27272a;
+  color: #fff;
+  padding: 14px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input[type="text"]:focus, input[type="password"]:focus {
+  border-color: #ef4444;
+}
