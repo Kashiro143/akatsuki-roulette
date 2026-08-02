@@ -276,8 +276,6 @@ export default function App() {
       currentMap[data.id] = data.assignedTo || null;
     });
 
-    // Ne déclenche des révélations qu'à partir du deuxième instantané,
-    // pour ne pas rejouer les attributions déjà existantes à l'ouverture de l'écran
     if (prevMonitorRingsRef.current) {
       list.forEach((ring) => {
         const wasAssigned = prevMonitorRingsRef.current[ring.id];
@@ -303,7 +301,6 @@ export default function App() {
     }
   }, []);
 
-  // Écoute Firestore en temps réel tant que l'écran de monitoring est ouvert
   useEffect(() => {
     if (step !== 'monitor') return;
     prevMonitorRingsRef.current = null;
@@ -519,7 +516,6 @@ export default function App() {
     setTimeout(() => setIsRouletteFadingIn(true), 50);
     setIsRolling(true);
 
-    // Le tirage réel est déterminé dès le départ, pour que la roulette s'arrête pile dessus
     const selected = availableRings[Math.floor(Math.random() * availableRings.length)];
 
     let counter = 0;
@@ -534,7 +530,6 @@ export default function App() {
         setRollingText(`${selected.kanji} — ${selected.name}`);
         setIsRouletteFinalizing(true);
 
-        // Laisser le joueur s'imprégner du résultat avant qu'il ne remonte à l'écran suivant
         setTimeout(() => setIsRouletteExiting(true), 1500);
         setTimeout(() => finalizeRingAssignment(finalAnswers, selected), 1900);
       } else {
@@ -546,13 +541,6 @@ export default function App() {
   };
 
   const finalizeRingAssignment = (finalAnswers, preSelectedRing) => {
-    const traitCounts = finalAnswers.reduce((acc, t) => {
-      acc[t] = (acc[t] || 0) + 1;
-      return acc;
-    }, {});
-    
-    const dominantTrait = Object.keys(traitCounts).reduce((a, b) => traitCounts[a] > traitCounts[b] ? a : b, 'pain');
-
     const selected = preSelectedRing || availableRings[Math.floor(Math.random() * availableRings.length)];
     
     setAssignedRing(selected);
@@ -616,7 +604,6 @@ export default function App() {
     }
   };
 
-  // Tracés SVG des fissures du sceau, irradiant depuis le centre (75,75)
   const crackPaths = [
     "M75,75 L68,50 L72,35 L60,18",
     "M75,75 L95,55 L88,38 L100,20",
@@ -629,7 +616,6 @@ export default function App() {
     "M75,75 L65,90 L45,95 L30,105",
   ];
 
-  // Particules générées au moment de la rupture du sceau (étincelles + éclats)
   const shatterParticles = useMemo(() => {
     if (!isSealBroken) return [];
     return Array.from({ length: 22 }, (_, i) => {
@@ -648,7 +634,6 @@ export default function App() {
     });
   }, [isSealBroken]);
 
-  // Tremblement croissant pendant le maintien de la pression sur le sceau
   const sealJitterX = isSealHolding ? (Math.random() - 0.5) * (sealProgress / 100) * 10 : 0;
   const sealJitterY = isSealHolding ? (Math.random() - 0.5) * (sealProgress / 100) * 10 : 0;
 
@@ -714,12 +699,15 @@ export default function App() {
         </button>
       )}
 
-      {/* Bouton de suivi en direct positionné en bas de page (uniquement sur la cover) */}
+      {/* Bouton de suivi en direct positionné en bas à gauche, symétrique au système de son */}
       {step === 'cover' && (
         <button
-          onClick={() => { playSound('click'); setStep('gallery-fullscreen'); }}
+          onClick={openMonitor}
           style={{
-            background: 'rgba(24, 24, 27, 0.5)',
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            background: 'rgba(5, 5, 7, 0.85)',
             border: '1px solid rgba(82, 82, 91, 0.4)',
             color: '#a1a1aa',
             padding: '6px 14px',
@@ -732,8 +720,7 @@ export default function App() {
             backdropFilter: 'blur(5px)',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            margin: '10px 0 0 0'
+            gap: '6px'
           }}
         >
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'freeRingPulse 1.6s ease-in-out infinite' }} />
@@ -751,7 +738,7 @@ export default function App() {
         zIndex: 0
       }}></div>
 
-      {/* Brume mystique ambiante, sur toutes les étapes */}
+      {/* Brume mystique ambiante */}
       <div className="smoke-container">
         <div className="smoke-puff smoke-1"></div>
         <div className="smoke-puff smoke-2"></div>
@@ -1071,7 +1058,6 @@ export default function App() {
             })}
           </div>
 
-          {/* Overlay de révélation lors d'une nouvelle attribution */}
           {revealRing && (
             <div style={{
               position: 'fixed', inset: 0, zIndex: 200,
@@ -1198,7 +1184,6 @@ export default function App() {
 
             <div style={{ position: 'relative', width: 'clamp(240px, 70vw, 340px)', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 
-              {/* Nuages rouges façon Akatsuki, ambiance décorative */}
               <AkatsukiCloud style={{
                 position: 'absolute', top: '-8%', left: '-14%', width: '46%', height: 'auto', opacity: isSealBroken ? 0 : 0.4,
                 animation: 'cloudDrift 9s ease-in-out infinite', transition: 'opacity 0.5s ease', filter: 'blur(0.3px)'
@@ -1208,7 +1193,6 @@ export default function App() {
                 animation: 'cloudDrift 11s ease-in-out infinite reverse', transition: 'opacity 0.5s ease', filter: 'blur(0.3px)'
               }} />
 
-              {/* Flash de rupture, plein écran (cœur blanc vers halo rouge) */}
               {isSealBroken && (
                 <div style={{
                   position: 'fixed', inset: 0, zIndex: 5, pointerEvents: 'none',
@@ -1217,7 +1201,6 @@ export default function App() {
                 }} />
               )}
 
-              {/* Onde de choc double, expansion rapide */}
               {isSealBroken && (
                 <>
                   <div style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '2px solid rgba(239,68,68,0.85)', animation: 'shockwaveExpand 0.9s ease-out forwards' }} />
@@ -1225,7 +1208,6 @@ export default function App() {
                 </>
               )}
 
-              {/* Éclats et étincelles projetés lors de la rupture */}
               {shatterParticles.map((p) => (
                 <div key={p.id} style={{
                   position: 'absolute', top: '50%', left: '50%',
@@ -1240,7 +1222,6 @@ export default function App() {
                 }} />
               ))}
 
-              {/* Anneau de runes rotatif, accélère avec la pression */}
               <svg width="100%" height="100%" viewBox="0 0 210 210" style={{
                 position: 'absolute',
                 opacity: isSealBroken ? 0 : 0.55,
@@ -1253,7 +1234,6 @@ export default function App() {
                 ))}
               </svg>
 
-              {/* Cercle de progression du maintien */}
               <svg width="85.7%" height="85.7%" viewBox="0 0 180 180" style={{
                 position: 'absolute', transform: 'rotate(-90deg)',
                 opacity: isSealBroken ? 0 : 1, transition: 'opacity 0.4s ease'
@@ -1267,7 +1247,6 @@ export default function App() {
                 />
               </svg>
 
-              {/* Sceau central : zone de pression + fissures progressives + kanji imposant */}
               <div
                 onMouseDown={startBreakingSeal}
                 onMouseUp={stopBreakingSeal}
@@ -1321,7 +1300,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ÉTAPE 4 : Questionnaire (Immersif & Étendu) */}
+        {/* ÉTAPE 4 : Questionnaire */}
         {step === 'quiz' && (
           <div style={{ 
             width: '100%', 
@@ -1406,7 +1385,6 @@ export default function App() {
 
             <div style={{ position: 'relative', width: 'clamp(220px, 60vw, 300px)', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 
-              {/* Flash de verdict quand la roulette s'arrête */}
               {isRouletteFinalizing && (
                 <div style={{
                   position: 'fixed', inset: 0, zIndex: 5, pointerEvents: 'none',
@@ -1415,7 +1393,6 @@ export default function App() {
                 }} />
               )}
 
-              {/* Anneau de runes, accélère à mesure que le tirage progresse */}
               <svg width="100%" height="100%" viewBox="0 0 210 210" style={{
                 position: 'absolute',
                 opacity: isRouletteFinalizing ? 0 : 0.55,
@@ -1428,7 +1405,6 @@ export default function App() {
                 ))}
               </svg>
 
-              {/* Cercle qui se referme à mesure qu'on approche du verdict */}
               <svg width="80%" height="80%" viewBox="0 0 180 180" style={{ position: 'absolute', transform: 'rotate(-90deg)', opacity: isRouletteExiting ? 0 : 1, transition: 'opacity 0.4s ease' }}>
                 <circle cx="90" cy="90" r="82" fill="none" stroke="#27272a" strokeWidth="2" />
                 <circle
@@ -1562,7 +1538,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ÉTAPE : Fini (plus de bague disponible) */}
+        {/* ÉTAPE : Fini */}
         {step === 'finished' && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '20px' }}>
             <h2 style={{ color: '#ef4444', fontSize: '24px', margin: 0, fontFamily: '"Yuji Boku", serif', letterSpacing: '2px' }}>Cercle Complet</h2>
