@@ -3,17 +3,17 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB652pqD4OpjOpA5En_6zGaOKCfnKvuPDM",
-  authDomain: "akatsuki-roulette.firebaseapp.com",
-  projectId: "akatsuki-roulette",
-  storageBucket: "akatsuki-roulette.firebasestorage.app",
-  messagingSenderId: "29445288629",
-  appId: "1:29445288629:web:0cf64daee2421a429084fc",
-  measurementId: "G-367NH8MFR8"
+  apiKey: "AIzaSyAxvASWA6luO-zU9XZ1i5otjYDEvoHN5PI",
+  authDomain: "akatsuki-roulette-test.firebaseapp.com",
+  projectId: "akatsuki-roulette-test",
+  storageBucket: "akatsuki-roulette-test.firebasestorage.app",
+  messagingSenderId: "457734216615",
+  appId: "1:457734216615:web:be7bafe07328bc013f7482",
+  measurementId: "G-4ZQK4FDSBS"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const testApp = initializeApp(firebaseConfig, "testApp");
+const db = getFirestore(testApp);
 
 // Synthèse sonore organique et mystique (esprit Akatsuki / sceau de chakra)
 const playSound = (type) => {
@@ -164,7 +164,7 @@ const questions = [
   }
 ];
 
-export default function App() {
+export default function Test() {
   const [step, setStep] = useState('cover');
   const [playerName, setPlayerName] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -835,7 +835,7 @@ export default function App() {
                     position: 'relative',
                     width: isSelected ? '45%' : '100%',
                     height: isSelected ? '100%' : '100%',
-                    backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
+                    backgroundImage: `url("${import.meta.env.BASE_URL}charactersTest/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     filter: isFree && !isSelected ? 'grayscale(0.75) brightness(0.55)' : 'none',
@@ -1028,7 +1028,7 @@ export default function App() {
                   borderStyle: isFree ? 'dashed' : 'solid',
                   boxShadow: isJustRevealed ? '0 0 30px rgba(239,68,68,0.6)' : 'none',
                   transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
-                  backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
+                  backgroundImage: `url("${import.meta.env.BASE_URL}charactersTest/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   filter: isFree ? 'grayscale(0.75) brightness(0.5)' : 'none'
@@ -1742,4 +1742,3 @@ export default function App() {
     </div>
   );
 }
-

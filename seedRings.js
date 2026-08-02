@@ -1,15 +1,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 
-// Ta configuration Firebase
+// Configuration de votre base de données de test
 const firebaseConfig = {
-  apiKey: "AIzaSyB652pqD4OpjOpA5En_6zGaOKCfnKvuPDM",
-  authDomain: "akatsuki-roulette.firebaseapp.com",
-  projectId: "akatsuki-roulette",
-  storageBucket: "akatsuki-roulette.firebasestorage.app",
-  messagingSenderId: "29445288629",
-  appId: "1:29445288629:web:0cf64daee2421a429084fc",
-  measurementId: "G-367NH8MFR8"
+  apiKey: "AIzaSyAxvASWA6luO-zU9XZ1i5otjYDEvoHN5PI",
+  authDomain: "akatsuki-roulette-test.firebaseapp.com",
+  projectId: "akatsuki-roulette-test",
+  storageBucket: "akatsuki-roulette-test.firebasestorage.app",
+  messagingSenderId: "457734216615",
+  appId: "1:457734216615:web:be7bafe07328bc013f7482",
+  measurementId: "G-4ZQK4FDSBS"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -99,13 +99,13 @@ const ringsData = {
 };
 
 async function seedDatabase() {
-  console.log("Injection des bagues dans Firestore...");
+  console.log("Injection des bagues dans Firestore (Environnement de test)...");
   try {
     for (const [id, data] of Object.entries(ringsData)) {
       await setDoc(doc(db, "rings", id), data);
       console.log(`Bague ajoutée : ${data.name} (${id})`);
     }
-    console.log("Toutes les bagues ont été ajoutées avec succès !");
+    console.log("Toutes les bagues ont été ajoutées avec succès dans le projet de test !");
     process.exit(0);
   } catch (error) {
     console.error("Erreur lors de l'injection :", error);
