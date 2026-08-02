@@ -180,7 +180,9 @@ export default function App() {
   const [isRouletteFadingIn, setIsRouletteFadingIn] = useState(false);
   const [rouletteCounter, setRouletteCounter] = useState(0);
   const [isRouletteFinalizing, setIsRouletteFinalizing] = useState(false);
+  const [isRouletteExiting, setIsRouletteExiting] = useState(false);
   const [isGalleryFadingIn, setIsGalleryFadingIn] = useState(false);
+  const [pendingAnswers, setPendingAnswers] = useState([]);
   
   const [selectedGalleryRing, setSelectedGalleryRing] = useState(null); 
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -273,7 +275,14 @@ export default function App() {
     e.preventDefault();
     if (!playerName.trim()) return;
     playSound('click');
-    setStep('sealed');
+    if (availableRings.length === 0) {
+      setStep('finished');
+      setTimeout(() => setIsResultFadingIn(true), 50);
+    } else {
+      setStep('quiz');
+      setIsQuizFadingIn(false);
+      setTimeout(() => setIsQuizFadingIn(true), 50);
+    }
   };
 
   const startSealRumble = () => {
@@ -347,7 +356,7 @@ export default function App() {
           stopSealRumble(true);
           playSound('boom');
           if (navigator.vibrate) navigator.vibrate([25, 30, 55]);
-          setTimeout(() => proceedToQuiz(), 950);
+          setTimeout(() => startRoulette(pendingAnswers), 950);
         }
         return next;
       });
@@ -375,18 +384,6 @@ export default function App() {
     }
   };
 
-  // Passage direct sans mini-jeu ni cercle de chargement
-  const proceedToQuiz = () => {
-    playSound('reveal');
-    if (availableRings.length === 0) {
-      setStep('finished');
-      setTimeout(() => setIsResultFadingIn(true), 50);
-    } else {
-      setStep('quiz');
-      setTimeout(() => setIsQuizFadingIn(true), 50);
-    }
-  };
-
   const handleAnswer = (trait) => {
     playSound('click');
     const newAnswers = [...answers, trait];
@@ -398,7 +395,14 @@ export default function App() {
         setIsQuizFadingIn(true);
       }, 200);
     } else {
-      startRoulette(newAnswers);
+      setPendingAnswers(newAnswers);
+      setIsQuizFadingIn(false);
+      setTimeout(() => {
+        setSealProgress(0);
+        setIsSealBroken(false);
+        setIsSealHolding(false);
+        setStep('sealed');
+      }, 200);
     }
   };
 
@@ -414,26 +418,37 @@ export default function App() {
     setIsRouletteFadingIn(false);
     setRouletteCounter(0);
     setIsRouletteFinalizing(false);
+    setIsRouletteExiting(false);
     setTimeout(() => setIsRouletteFadingIn(true), 50);
     setIsRolling(true);
+
+    // Le tirage réel est déterminé dès le départ, pour que la roulette s'arrête pile dessus
+    const selected = availableRings[Math.floor(Math.random() * availableRings.length)];
+
     let counter = 0;
     const interval = setInterval(() => {
-      playSound('roulette');
-      const randomRing = availableRings[Math.floor(Math.random() * availableRings.length)];
-      setRollingText(`${randomRing.kanji} — ${randomRing.name}`);
       counter++;
       setRouletteCounter(counter);
+
       if (counter > 30) {
         clearInterval(interval);
-        setIsRouletteFinalizing(true);
         playSound('boom');
         if (navigator.vibrate) navigator.vibrate([20, 25, 40]);
-        setTimeout(() => finalizeRingAssignment(finalAnswers), 550);
+        setRollingText(`${selected.kanji} — ${selected.name}`);
+        setIsRouletteFinalizing(true);
+
+        // Laisser le joueur s'imprégner du résultat avant qu'il ne remonte à l'écran suivant
+        setTimeout(() => setIsRouletteExiting(true), 1500);
+        setTimeout(() => finalizeRingAssignment(finalAnswers, selected), 1900);
+      } else {
+        playSound('roulette');
+        const randomRing = availableRings[Math.floor(Math.random() * availableRings.length)];
+        setRollingText(`${randomRing.kanji} — ${randomRing.name}`);
       }
     }, 70);
   };
 
-  const finalizeRingAssignment = (finalAnswers) => {
+  const finalizeRingAssignment = (finalAnswers, preSelectedRing) => {
     const traitCounts = finalAnswers.reduce((acc, t) => {
       acc[t] = (acc[t] || 0) + 1;
       return acc;
@@ -441,7 +456,7 @@ export default function App() {
     
     const dominantTrait = Object.keys(traitCounts).reduce((a, b) => traitCounts[a] > traitCounts[b] ? a : b, 'pain');
 
-    const selected = availableRings[Math.floor(Math.random() * availableRings.length)];
+    const selected = preSelectedRing || availableRings[Math.floor(Math.random() * availableRings.length)];
     
     setAssignedRing(selected);
     setIsRolling(false);
@@ -740,21 +755,19 @@ export default function App() {
                         </span>
                         
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                          <span style={{ color: isFree ? '#d4d4d8' : '#f4f4f5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', maxWidth: '90%' }}>
+                            {activeHolder}
+                          </span>
                           {isFree ? (
-                            <span style={{ color: '#71717a', fontSize: '10px', fontStyle: 'italic', letterSpacing: '1px' }}>
+                            <span style={{ color: '#71717a', fontSize: '9px', fontStyle: 'italic', letterSpacing: '0.5px', opacity: 0.85 }}>
                               En attente d'un porteur
                             </span>
                           ) : (
-                            <>
-                              <span style={{ color: '#f4f4f5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '600', maxWidth: '90%' }}>
-                                {activeHolder}
+                            ring.owner && ring.owner !== activeHolder && (
+                              <span style={{ color: '#a1a1aa', fontSize: '9px', fontStyle: 'italic', letterSpacing: '0.5px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>
+                                {ring.owner}
                               </span>
-                              {ring.owner && ring.owner !== activeHolder && (
-                                <span style={{ color: '#a1a1aa', fontSize: '9px', fontStyle: 'italic', letterSpacing: '0.5px', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>
-                                  {ring.owner}
-                                </span>
-                              )}
-                            </>
+                            )
                           )}
                         </div>
                       </div>
@@ -785,13 +798,12 @@ export default function App() {
                         <div>
                           <span style={{ fontSize: '10px', color: '#71717a', textTransform: 'uppercase', fontFamily: 'monospace', letterSpacing: '2px' }}>Porteur Actuel</span>
                           <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {isFree ? (
-                              <p style={{ color: '#a1a1aa', fontSize: '15px', margin: 0, fontStyle: 'italic' }}>
-                                ⛓️ Bague libre — en attente d'un porteur
-                              </p>
-                            ) : (
-                              <p style={{ color: '#f87171', fontSize: '16px', margin: 0, fontWeight: 'bold' }}>
-                                👤 {activeHolder}
+                            <p style={{ color: '#f87171', fontSize: '16px', margin: 0, fontWeight: 'bold' }}>
+                              👤 {activeHolder}
+                            </p>
+                            {isFree && (
+                              <p style={{ color: '#a1a1aa', fontSize: '11px', fontStyle: 'italic', margin: 0, opacity: 0.9 }}>
+                                ⛓️ Bague libre — en attente d'un nouveau porteur
                               </p>
                             )}
                             {ring.owner && ring.owner !== activeHolder && (
@@ -1129,8 +1141,8 @@ export default function App() {
               <span style={{ color: '#71717a', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '3px', fontFamily: 'monospace' }}>
                 Résonance Spirituelle
               </span>
-              <h2 style={{ color: '#e4e4e7', fontSize: '20px', fontWeight: '400', margin: 0 }}>
-                Le destin des bagues se scelle...
+              <h2 style={{ color: '#e4e4e7', fontSize: '20px', fontWeight: '400', margin: 0, opacity: isRouletteExiting ? 0 : 1, transition: 'opacity 0.4s ease' }}>
+                {isRouletteFinalizing ? 'Le sceau a choisi...' : 'Le destin des bagues se scelle...'}
               </h2>
             </div>
 
@@ -1159,7 +1171,7 @@ export default function App() {
               </svg>
 
               {/* Cercle qui se referme à mesure qu'on approche du verdict */}
-              <svg width="80%" height="80%" viewBox="0 0 180 180" style={{ position: 'absolute', transform: 'rotate(-90deg)' }}>
+              <svg width="80%" height="80%" viewBox="0 0 180 180" style={{ position: 'absolute', transform: 'rotate(-90deg)', opacity: isRouletteExiting ? 0 : 1, transition: 'opacity 0.4s ease' }}>
                 <circle cx="90" cy="90" r="82" fill="none" stroke="#27272a" strokeWidth="2" />
                 <circle
                   cx="90" cy="90" r="82" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round"
@@ -1170,11 +1182,14 @@ export default function App() {
               </svg>
 
               <div key={rollingText} style={{
-                color: '#ef4444', fontSize: 'clamp(20px, 4.2vw, 30px)', fontFamily: '"Yuji Boku", serif',
+                color: '#ef4444',
+                fontSize: isRouletteFinalizing ? 'clamp(26px, 5.5vw, 38px)' : 'clamp(20px, 4.2vw, 30px)',
+                fontFamily: '"Yuji Boku", serif',
                 padding: '0 12px', textShadow: '0 0 25px rgba(239, 68, 68, 0.7)',
                 animation: isRouletteFinalizing ? 'none' : 'rouletteTextFlicker 0.12s ease-out',
-                transform: isRouletteFinalizing ? 'scale(1.15)' : 'scale(1)',
-                transition: 'transform 0.3s ease-out'
+                transform: isRouletteExiting ? 'translateY(-46px) scale(1.05)' : (isRouletteFinalizing ? 'scale(1.15)' : 'scale(1)'),
+                opacity: isRouletteExiting ? 0 : 1,
+                transition: 'transform 0.4s ease-in, opacity 0.4s ease-in, font-size 0.3s ease-out'
               }}>
                 {rollingText}
               </div>
@@ -1451,7 +1466,7 @@ export default function App() {
       </div>
 
       <footer style={{ textAlign: 'center', fontSize: '8px', color: '#27272a', fontFamily: 'monospace', zIndex: '2', letterSpacing: '1px' }}>
-        <span>Akatsuki Systeme - Admin panel</span> — <button onClick={() => setStep('admin-login')} style={{ background: 'none', border: 'none', color: '#27272a', textDecoration: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>.</button>
+        <span>Akatsuki Legacy - System</span> — <button onClick={() => setStep('admin-login')} style={{ background: 'none', border: 'none', color: '#27272a', textDecoration: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>.</button>
       </footer>
 
     </div>
