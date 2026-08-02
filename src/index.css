@@ -127,3 +127,13 @@ input[type="text"]:focus, input[type="password"]:focus {
   0% { transform: scale(0.2); opacity: 0.9; }
   100% { transform: scale(1.6); opacity: 0; }
 }
+
+@keyframes monitorOverlayIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes monitorNameRise {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}

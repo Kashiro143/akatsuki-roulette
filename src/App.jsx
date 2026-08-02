@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyB652pqD4OpjOpA5En_6zGaOKCfnKvuPDM",
@@ -204,6 +204,17 @@ export default function App() {
   const sealDecayInterval = useRef(null);
   const sealRumbleRef = useRef(null);
 
+  // Visibilité du Cercle des Détenteurs, pilotée depuis le panneau admin (masquée par défaut)
+  const [isGalleryEnabled, setIsGalleryEnabled] = useState(false);
+
+  // Écran de monitoring public en direct des attributions de bagues
+  const [monitorRings, setMonitorRings] = useState([]);
+  const [revealRing, setRevealRing] = useState(null);
+  const revealQueueRef = useRef([]);
+  const isRevealingRef = useRef(false);
+  const prevMonitorRingsRef = useRef(null);
+  const monitorUnsubRef = useRef(null);
+
   const fetchRings = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'rings'));
@@ -221,13 +232,93 @@ export default function App() {
     }
   };
 
+  const fetchGallerySettings = async () => {
+    try {
+      const settingsSnap = await getDoc(doc(db, 'settings', 'gallery'));
+      setIsGalleryEnabled(settingsSnap.exists() ? !!settingsSnap.data().enabled : false);
+    } catch (e) {
+      console.error("Erreur chargement des réglages du Cercle des Détenteurs:", e);
+    }
+  };
+
+  const toggleGalleryVisibility = async () => {
+    const nextValue = !isGalleryEnabled;
+    setIsGalleryEnabled(nextValue);
+    try {
+      await setDoc(doc(db, 'settings', 'gallery'), { enabled: nextValue }, { merge: true });
+    } catch (e) {
+      console.error("Erreur mise à jour des réglages du Cercle des Détenteurs:", e);
+      setIsGalleryEnabled(!nextValue);
+    }
+  };
+
+  const processRevealQueue = () => {
+    if (isRevealingRef.current) return;
+    if (revealQueueRef.current.length === 0) return;
+    const next = revealQueueRef.current.shift();
+    isRevealingRef.current = true;
+    setRevealRing(next);
+    playSound('boom');
+    if (navigator.vibrate) navigator.vibrate([30, 40, 60]);
+    setTimeout(() => {
+      setRevealRing(null);
+      isRevealingRef.current = false;
+      setTimeout(() => processRevealQueue(), 500);
+    }, 4200);
+  };
+
+  const processMonitorSnapshot = (querySnapshot) => {
+    const list = [];
+    const currentMap = {};
+    querySnapshot.forEach((docSnap) => {
+      const data = { id: docSnap.id, ...docSnap.data() };
+      list.push(data);
+      currentMap[data.id] = data.assignedTo || null;
+    });
+
+    // Ne déclenche des révélations qu'à partir du deuxième instantané,
+    // pour ne pas rejouer les attributions déjà existantes à l'ouverture de l'écran
+    if (prevMonitorRingsRef.current) {
+      list.forEach((ring) => {
+        const wasAssigned = prevMonitorRingsRef.current[ring.id];
+        if (!wasAssigned && ring.assignedTo) {
+          revealQueueRef.current.push(ring);
+        }
+      });
+    }
+    prevMonitorRingsRef.current = currentMap;
+    setMonitorRings(list);
+    processRevealQueue();
+  };
+
   useEffect(() => {
     fetchRings();
+    fetchGallerySettings();
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
+    if (window.location.hash === '#monitor') {
+      setStep('monitor');
+    }
   }, []);
+
+  // Écoute Firestore en temps réel tant que l'écran de monitoring est ouvert
+  useEffect(() => {
+    if (step !== 'monitor') return;
+    prevMonitorRingsRef.current = null;
+    revealQueueRef.current = [];
+    isRevealingRef.current = false;
+    setRevealRing(null);
+    const unsub = onSnapshot(collection(db, 'rings'), (snap) => {
+      processMonitorSnapshot(snap);
+    }, (err) => console.error("Erreur écoute en direct :", err));
+    monitorUnsubRef.current = unsub;
+    return () => {
+      if (monitorUnsubRef.current) monitorUnsubRef.current();
+      monitorUnsubRef.current = null;
+    };
+  }, [step]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -413,6 +504,12 @@ export default function App() {
     setTimeout(() => setIsGalleryFadingIn(true), 50);
   };
 
+  const openMonitor = () => {
+    playSound('click');
+    window.location.hash = 'monitor';
+    setStep('monitor');
+  };
+
   const startRoulette = (finalAnswers) => {
     setStep('roulette');
     setIsRouletteFadingIn(false);
@@ -588,8 +685,8 @@ export default function App() {
         />
       </div>
 
-      {/* Bouton pour accéder au Cercle des Détenteurs depuis la Cover */}
-      {step === 'cover' && (
+      {/* Bouton pour accéder au Cercle des Détenteurs depuis la Cover — masqué tant que l'admin ne l'a pas révélé */}
+      {step === 'cover' && isGalleryEnabled && (
         <button
           onClick={openGallery}
           style={{
@@ -614,6 +711,33 @@ export default function App() {
         >
           <AkatsukiCloud style={{ width: '16px', height: 'auto' }} />
           Cercle des Détenteurs
+        </button>
+      )}
+
+      {/* Bouton de suivi en direct positionné en bas de page (uniquement sur la cover) */}
+      {step === 'cover' && (
+        <button
+          onClick={() => { playSound('click'); setStep('gallery-fullscreen'); }}
+          style={{
+            background: 'rgba(24, 24, 27, 0.5)',
+            border: '1px solid rgba(82, 82, 91, 0.4)',
+            color: '#a1a1aa',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontSize: '10px',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            cursor: 'pointer',
+            zIndex: 10,
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            margin: '10px 0 0 0'
+          }}
+        >
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'freeRingPulse 1.6s ease-in-out infinite' }} />
+          Suivi en direct
         </button>
       )}
 
@@ -862,6 +986,140 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ÉCRAN PUBLIC : Suivi en direct des attributions de bagues */}
+      {step === 'monitor' && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(5, 5, 7, 0.98)',
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '20px',
+          boxSizing: 'border-box',
+          overflowY: 'auto'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexShrink: 0 }}>
+            <button
+              onClick={() => { playSound('click'); window.location.hash = ''; setStep('cover'); }}
+              style={{ background: 'transparent', border: 'none', color: '#a1a1aa', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', cursor: 'pointer' }}
+            >
+              ← Quitter
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'freeRingPulse 1.6s ease-in-out infinite', boxShadow: '0 0 8px rgba(239,68,68,0.8)' }} />
+              <h2 style={{ color: '#ef4444', fontSize: '18px', fontFamily: '"Yuji Boku", serif', letterSpacing: '3px', margin: 0 }}>
+                Suivi en Direct
+              </h2>
+            </div>
+            <div style={{ width: '70px' }}></div>
+          </div>
+
+          <p style={{ textAlign: 'center', color: '#71717a', fontSize: '11px', letterSpacing: '1px', margin: '0 0 22px 0' }}>
+            {monitorRings.filter(r => r.assignedTo).length} / {monitorRings.length} bagues attribuées
+          </p>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: '12px',
+            maxWidth: '900px',
+            width: '100%',
+            margin: '0 auto'
+          }}>
+            {monitorRings.map((ring) => {
+              const isFree = !ring.assignedTo;
+              const isJustRevealed = revealRing?.id === ring.id;
+              return (
+                <div key={ring.id} style={{
+                  position: 'relative',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  aspectRatio: '3 / 4',
+                  border: `1px solid ${isJustRevealed ? '#ef4444' : isFree ? 'rgba(82, 82, 91, 0.4)' : 'rgba(239, 68, 68, 0.25)'}`,
+                  borderStyle: isFree ? 'dashed' : 'solid',
+                  boxShadow: isJustRevealed ? '0 0 30px rgba(239,68,68,0.6)' : 'none',
+                  transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
+                  backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: isFree ? 'grayscale(0.75) brightness(0.5)' : 'none'
+                }}>
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(to top, rgba(5,5,7,0.95) 20%, rgba(5,5,7,0.25))',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center',
+                    padding: '10px 6px', textAlign: 'center', gap: '2px'
+                  }}>
+                    <span style={{ color: isFree ? '#a1a1aa' : '#ef4444', fontSize: '18px', fontFamily: '"Yuji Boku", serif', textShadow: isFree ? 'none' : '0 0 8px rgba(239,68,68,0.5)' }}>
+                      {ring.kanji}
+                    </span>
+                    <span style={{ color: '#e4e4e7', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.75 }}>
+                      {ring.name}
+                    </span>
+                    {isFree ? (
+                      <span style={{ color: '#71717a', fontSize: '9px', fontStyle: 'italic', marginTop: '2px' }}>Libre</span>
+                    ) : (
+                      <span style={{ color: '#f4f4f5', fontSize: '10px', fontWeight: '600', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                        {ring.assignedTo}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Overlay de révélation lors d'une nouvelle attribution */}
+          {revealRing && (
+            <div style={{
+              position: 'fixed', inset: 0, zIndex: 200,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(5, 5, 7, 0.9)', backdropFilter: 'blur(4px)',
+              animation: 'monitorOverlayIn 0.4s ease-out'
+            }}>
+              <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                background: 'radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(239,68,68,0.5) 35%, rgba(239,68,68,0) 68%)',
+                animation: 'sealFlash 0.8s ease-out forwards'
+              }} />
+
+              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px', padding: '20px' }}>
+                <AkatsukiCloud style={{ position: 'absolute', top: '-60px', left: '-70px', width: '90px', height: 'auto', opacity: 0.35, animation: 'cloudDrift 9s ease-in-out infinite' }} />
+                <AkatsukiCloud style={{ position: 'absolute', bottom: '-50px', right: '-75px', width: '80px', height: 'auto', opacity: 0.32, animation: 'cloudDrift 11s ease-in-out infinite reverse' }} />
+
+                <span style={{ color: '#71717a', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '4px', fontFamily: 'monospace' }}>
+                  Nouvelle Attribution
+                </span>
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{
+                    position: 'absolute', width: '260px', height: '260px', borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(239,68,68,0.4) 0%, rgba(239,68,68,0) 70%)',
+                    animation: 'resultBurst 1s ease-out', pointerEvents: 'none'
+                  }} />
+                  <h2 style={{
+                    color: '#ef4444', fontSize: 'clamp(30px, 7vw, 48px)', fontFamily: '"Yuji Boku", serif', margin: 0,
+                    textShadow: '0 0 25px rgba(239, 68, 68, 0.7)', position: 'relative',
+                    animation: 'resultKanjiReveal 0.9s ease-out'
+                  }}>
+                    {revealRing.kanji} — {revealRing.name}
+                  </h2>
+                </div>
+
+                <p style={{ color: '#f4f4f5', fontSize: 'clamp(20px, 4.5vw, 30px)', fontWeight: 'bold', margin: 0, letterSpacing: '1px', animation: 'monitorNameRise 0.6s ease-out 0.3s both' }}>
+                  👤 {revealRing.assignedTo}
+                </p>
+                <span style={{ color: '#71717a', fontSize: '11px', fontStyle: 'italic', letterSpacing: '1px' }}>
+                  a rejoint l'Akatsuki
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* CONTENEUR PRINCIPAL DU SITE */}
       <div style={{ width: '100%', maxWidth: '600px', zIndex: 2, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -1277,24 +1535,26 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              onClick={openGallery}
-              style={{
-                background: 'rgba(153, 27, 27, 0.3)',
-                border: '1px solid rgba(239, 68, 68, 0.6)',
-                color: '#fca5a5',
-                padding: '10px 24px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                marginTop: '5px'
-              }}
-            >
-              Regarder le Cercle des Détenteurs 💍
-            </button>
+            {isGalleryEnabled && (
+              <button
+                onClick={openGallery}
+                style={{
+                  background: 'rgba(153, 27, 27, 0.3)',
+                  border: '1px solid rgba(239, 68, 68, 0.6)',
+                  color: '#fca5a5',
+                  padding: '10px 24px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '2px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  marginTop: '5px'
+                }}
+              >
+                Regarder le Cercle des Détenteurs 💍
+              </button>
+            )}
 
             <p style={{ color: '#71717a', fontSize: '12px', fontStyle: 'italic', margin: '5px 0 0 0', letterSpacing: '1px' }}>
               « Votre âme appartient désormais aux ténèbres, {playerName}. »
@@ -1310,24 +1570,26 @@ export default function App() {
               Toutes les bagues ont trouvé preneur. Le plan de l'Œil de la Lune est en marche.
             </p>
             
-            <button
-              onClick={openGallery}
-              style={{
-                background: 'rgba(153, 27, 27, 0.3)',
-                border: '1px solid rgba(239, 68, 68, 0.6)',
-                color: '#fca5a5',
-                padding: '10px 24px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                marginTop: '10px'
-              }}
-            >
-              Regarder le Cercle des Détenteurs 💍
-            </button>
+            {isGalleryEnabled && (
+              <button
+                onClick={openGallery}
+                style={{
+                  background: 'rgba(153, 27, 27, 0.3)',
+                  border: '1px solid rgba(239, 68, 68, 0.6)',
+                  color: '#fca5a5',
+                  padding: '10px 24px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '2px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  marginTop: '10px'
+                }}
+              >
+                Regarder le Cercle des Détenteurs 💍
+              </button>
+            )}
           </div>
         )}
 
@@ -1360,6 +1622,38 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ color: '#ef4444', fontSize: '14px', textTransform: 'uppercase', margin: 0, letterSpacing: '1px' }}>Panneau de Contrôle</h2>
               <button onClick={() => setStep('cover')} style={{ background: 'none', border: 'none', color: '#a1a1aa', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer' }}>Quitter</button>
+            </div>
+
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: '#050507', padding: '12px 14px', borderRadius: '6px', border: '1px solid #1f1f23'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ color: '#e4e4e7', fontSize: '12px', fontWeight: '600' }}>
+                  Cercle des Détenteurs visible aux joueurs
+                </span>
+                <span style={{ color: '#71717a', fontSize: '10px' }}>
+                  {isGalleryEnabled ? 'Révélé — les joueurs peuvent voir qui compose l\'équipe' : 'Masqué — le suspense reste entier'}
+                </span>
+              </div>
+              <button
+                onClick={toggleGalleryVisibility}
+                aria-label="Basculer la visibilité du Cercle des Détenteurs"
+                style={{
+                  width: '46px', height: '26px', borderRadius: '13px', position: 'relative', flexShrink: 0,
+                  border: `1px solid ${isGalleryEnabled ? '#ef4444' : '#3f3f46'}`,
+                  background: isGalleryEnabled ? 'rgba(239, 68, 68, 0.35)' : 'rgba(63, 63, 70, 0.3)',
+                  cursor: 'pointer', transition: 'all 0.25s ease'
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: '2px', left: isGalleryEnabled ? '22px' : '2px',
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  background: isGalleryEnabled ? '#ef4444' : '#71717a',
+                  boxShadow: isGalleryEnabled ? '0 0 8px rgba(239,68,68,0.7)' : 'none',
+                  transition: 'left 0.25s ease, background 0.25s ease'
+                }} />
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -1466,7 +1760,7 @@ export default function App() {
       </div>
 
       <footer style={{ textAlign: 'center', fontSize: '8px', color: '#27272a', fontFamily: 'monospace', zIndex: '2', letterSpacing: '1px' }}>
-        <span>Akatsuki Legacy - System</span> — <button onClick={() => setStep('admin-login')} style={{ background: 'none', border: 'none', color: '#27272a', textDecoration: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>.</button>
+        <span>Akatsuki Systeme - Admin panel</span> — <button onClick={() => setStep('admin-login')} style={{ background: 'none', border: 'none', color: '#27272a', textDecoration: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>.</button>
       </footer>
 
     </div>
