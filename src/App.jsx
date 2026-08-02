@@ -423,15 +423,17 @@ export default function App() {
         </button>
       )}
 
-      {/* Arrière-plan général */}
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundImage: 'linear-gradient(rgba(5, 5, 7, 0.82), rgba(5, 5, 7, 0.96)), url("/background.jpg")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        zIndex: 0
-      }}></div>
+            {/* Arrière-plan général */}
+<div style={{
+  position: 'fixed',
+  inset: 0,
+  backgroundImage: `linear-gradient(rgba(5, 5, 7, 0.82), rgba(5, 5, 7, 0.96)), url("${import.meta.env.BASE_URL}background.jpg")`,
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  zIndex: 0
+}}></div>
+
+      
 
       <div style={{ zIndex: 2 }}></div>
 
@@ -509,7 +511,7 @@ export default function App() {
                     position: 'relative',
                     width: isSelected ? '45%' : '100%',
                     height: isSelected ? '100%' : '100%',
-                    backgroundImage: `url("/characters/${ring.id}.jpg"), url("/background.jpg")`,
+                    backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     transition: 'all 0.4s ease'
