@@ -262,6 +262,15 @@ export default function App() {
   // Visibilité du Cercle des Détenteurs, pilotée depuis le panneau admin (masquée par défaut)
   const [isGalleryEnabled, setIsGalleryEnabled] = useState(false);
 
+  // Détection d'écran mobile pour adapter l'affichage du Cercle des Détenteurs
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 820);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 820);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Écran de monitoring public en direct des attributions de bagues
   const [monitorRings, setMonitorRings] = useState([]);
   const [revealRing, setRevealRing] = useState(null);
@@ -810,22 +819,22 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflowX: 'hidden', boxSizing: 'border-box', padding: '30px 20px', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
-      <audio ref={audioRef} src="pain-theme.mp3" loop />
+      <audio ref={audioRef} src={`${import.meta.env.BASE_URL}pain-theme.mp3`} loop preload="auto" />
 
       {/* Contrôleur audio discret */}
       <div style={{
         position: 'fixed',
-        top: '20px',
-        right: '20px',
+        top: isMobile ? '12px' : '20px',
+        right: isMobile ? '12px' : '20px',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         background: 'rgba(5, 5, 7, 0.85)',
         backdropFilter: 'blur(5px)',
         border: '1px solid rgba(185, 28, 28, 0.3)',
-        padding: '6px 12px',
+        padding: isMobile ? '6px 10px' : '6px 12px',
         borderRadius: '20px',
-        zIndex: 10
+        zIndex: 20
       }}>
         <button 
           onClick={toggleMusic}
@@ -846,18 +855,20 @@ export default function App() {
           onClick={openGallery}
           style={{
             position: 'fixed',
-            top: '20px',
-            left: '20px',
+            top: isMobile ? '74px' : '20px',
+            left: isMobile ? 'auto' : '20px',
+            right: isMobile ? '12px' : 'auto',
+            whiteSpace: 'nowrap',
             background: 'rgba(153, 27, 27, 0.2)',
             border: '1px solid rgba(239, 68, 68, 0.4)',
             color: '#fca5a5',
-            padding: '6px 14px',
+            padding: isMobile ? '6px 12px' : '6px 14px',
             borderRadius: '20px',
             fontSize: '11px',
             textTransform: 'uppercase',
-            letterSpacing: '2px',
+            letterSpacing: isMobile ? '1px' : '2px',
             cursor: 'pointer',
-            zIndex: 10,
+            zIndex: 20,
             backdropFilter: 'blur(5px)',
             display: 'flex',
             alignItems: 'center',
@@ -915,12 +926,16 @@ export default function App() {
 
           <div style={{ 
             display: 'flex', 
-            flexDirection: 'row', 
+            flexDirection: isMobile ? 'column' : 'row', 
             flex: 1, 
             gap: '8px', 
             width: '100%', 
             height: 'calc(100vh - 70px)',
-            overflow: 'hidden'
+            overflowY: isMobile ? 'auto' : 'hidden',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: isMobile ? '12px' : 0,
+            boxSizing: 'border-box'
           }}>
             {allRings.map((ring, index) => {
               const isSelected = selectedGalleryRing?.id === ring.id;
@@ -935,6 +950,7 @@ export default function App() {
               }
 
               const activeHolder = ring.assignedTo || ring.owner;
+              const isMobileSelected = isMobile && isSelected;
 
               return (
                 <div
@@ -943,21 +959,23 @@ export default function App() {
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                   style={{
-                    flex: flexValue,
-                    height: '100%',
+                    flex: isMobile ? '0 0 auto' : flexValue,
+                    width: isMobile ? '100%' : 'auto',
+                    height: isMobile ? (isMobileSelected ? 'auto' : '120px') : '100%',
                     background: 'rgba(10, 10, 14, 0.9)',
                     border: `1px solid ${isSelected ? '#ef4444' : isHovered ? 'rgba(239, 68, 68, 0.6)' : isFree ? 'rgba(82, 82, 91, 0.4)' : 'rgba(82, 82, 91, 0.25)'}`,
                     borderStyle: isFree && !isSelected && !isHovered ? 'dashed' : 'solid',
                     borderRadius: '6px',
-                    overflow: 'hidden',
+                    overflow: isMobileSelected ? 'visible' : 'hidden',
                     position: 'relative',
                     cursor: 'pointer',
                     opacity: isGalleryFadingIn ? 1 : 0,
                     transform: isGalleryFadingIn ? 'translateY(0)' : 'translateY(24px)',
                     transition: `opacity 0.5s ease ${index * 0.04}s, transform 0.5s ease ${index * 0.04}s, flex 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s ease, box-shadow 0.4s ease`,
                     display: 'flex',
-                    flexDirection: isSelected ? 'row' : 'column',
-                    boxShadow: isSelected ? '0 0 45px rgba(239, 68, 68, 0.45)' : isHovered ? '0 0 20px rgba(239, 68, 68, 0.2)' : 'none'
+                    flexDirection: isMobileSelected ? 'column' : (isSelected ? 'row' : 'column'),
+                    boxShadow: isSelected ? '0 0 45px rgba(239, 68, 68, 0.45)' : isHovered ? '0 0 20px rgba(239, 68, 68, 0.2)' : 'none',
+                    flexShrink: isMobile ? 0 : undefined
                   }}
                 >
                   {isFree && !isSelected && (
@@ -974,8 +992,8 @@ export default function App() {
 
                   <div style={{
                     position: 'relative',
-                    width: isSelected ? '45%' : '100%',
-                    height: isSelected ? '100%' : '100%',
+                    width: isMobile ? (isMobileSelected ? '100%' : '120px') : (isSelected ? '45%' : '100%'),
+                    height: isMobile ? (isMobileSelected ? '200px' : '100%') : '100%',
                     backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -986,11 +1004,11 @@ export default function App() {
                       position: 'absolute',
                       inset: 0,
                       background: isSelected 
-                        ? 'linear-gradient(to right, transparent, rgba(5,5,7,0.8))'
+                        ? (isMobile ? 'linear-gradient(to top, transparent 40%, rgba(5,5,7,0.95))' : 'linear-gradient(to right, transparent, rgba(5,5,7,0.8))')
                         : 'linear-gradient(to top, rgba(5,5,7,0.95) 15%, rgba(5,5,7,0.4))'
                     }}></div>
                     
-                    {!isSelected && (
+                    {!isSelected && !isMobile && (
                       <div style={{
                         position: 'absolute',
                         bottom: '20px',
@@ -1026,18 +1044,48 @@ export default function App() {
                     )}
                   </div>
 
+                  {isMobile && !isSelected && (
+                    <div style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      padding: '12px 14px',
+                      minWidth: 0,
+                      boxSizing: 'border-box'
+                    }}>
+                      <span style={{ color: isFree ? '#a1a1aa' : '#ef4444', fontFamily: '"Yuji Boku", serif', fontSize: '20px', textShadow: isFree ? 'none' : '0 0 10px rgba(239,68,68,0.5)' }}>
+                        {ring.kanji} <span style={{ fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#e4e4e7' }}>{ring.name}</span>
+                      </span>
+                      <span style={{ color: '#f4f4f5', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {activeHolder}
+                      </span>
+                      {isFree ? (
+                        <span style={{ color: '#71717a', fontSize: '9px', fontStyle: 'italic' }}>En attente d'un porteur</span>
+                      ) : (
+                        ring.owner && ring.owner !== activeHolder && (
+                          <span style={{ color: '#a1a1aa', fontSize: '9px', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {ring.owner}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  )}
+
                   {isSelected && (
                     <div style={{
-                      width: '55%',
-                      height: '100%',
-                      padding: '30px',
+                      width: isMobile ? '100%' : '55%',
+                      height: isMobile ? 'auto' : '100%',
+                      padding: isMobile ? '18px' : '30px',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
                       background: 'rgba(8, 8, 12, 0.98)',
-                      overflowY: 'auto',
+                      overflowY: isMobile ? 'visible' : 'auto',
                       boxSizing: 'border-box',
-                      borderLeft: '1px solid rgba(239, 68, 68, 0.3)'
+                      borderLeft: isMobile ? 'none' : '1px solid rgba(239, 68, 68, 0.3)',
+                      borderTop: isMobile ? '1px solid rgba(239, 68, 68, 0.3)' : 'none'
                     }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
@@ -1148,12 +1196,16 @@ export default function App() {
 
           <div style={{
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: isMobile ? 'column' : 'row',
             flex: 1,
             gap: '8px',
             width: '100%',
             height: 'calc(100vh - 70px)',
-            overflow: 'hidden'
+            overflowY: isMobile ? 'auto' : 'hidden',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: isMobile ? '12px' : 0,
+            boxSizing: 'border-box'
           }}>
             {monitorRings.map((ring, index) => {
               const isFree = !ring.assignedTo;
@@ -1166,8 +1218,10 @@ export default function App() {
                   onMouseLeave={() => setHoveredMonitorIndex(null)}
                   style={{
                     position: 'relative',
-                    flex: isHovered ? '2.2 0 0%' : '1',
-                    height: '100%',
+                    flex: isMobile ? '0 0 auto' : (isHovered ? '2.2 0 0%' : '1'),
+                    width: isMobile ? '100%' : 'auto',
+                    height: isMobile ? '110px' : '100%',
+                    flexShrink: isMobile ? 0 : undefined,
                     borderRadius: '6px',
                     overflow: 'hidden',
                     border: `1px solid ${isJustRevealed ? '#ef4444' : isFree ? 'rgba(82, 82, 91, 0.4)' : 'rgba(239, 68, 68, 0.25)'}`,
