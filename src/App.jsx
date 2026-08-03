@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion, getDoc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+
+// Identifiant d'appareil persistant (localStorage), utilisé pour bloquer une seconde tentative de rituel
+const getOrCreateDeviceId = () => {
+  try {
+    let id = localStorage.getItem('akatsuki_device_id');
+    if (!id) {
+      id = (window.crypto && window.crypto.randomUUID)
+        ? window.crypto.randomUUID()
+        : `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem('akatsuki_device_id', id);
+    }
+    return id;
+  } catch (e) {
+    return `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+};
 
 const firebaseConfig = {
   apiKey: "AIzaSyB652pqD4OpjOpA5En_6zGaOKCfnKvuPDM",
@@ -164,6 +180,44 @@ const questions = [
   }
 ];
 
+// Association bague → trait spirituel (le quiz oriente désormais la roulette)
+const RING_TRAITS = {
+  zero: 'pain',
+  seiryu: 'art',
+  byakko: 'art',
+  suzaku: 'illusion',
+  koryu: 'illusion',
+  nansei: 'chaos',
+  hokusei: 'chaos',
+  santai: 'pain',
+  gyokunan: 'art',
+  honto: 'illusion'
+};
+
+// Trait dominant issu des réponses au quiz
+const getDominantTrait = (answers) => {
+  const counts = { pain: 0, illusion: 0, chaos: 0, art: 0 };
+  (answers || []).forEach((a) => { if (counts[a] !== undefined) counts[a]++; });
+  return Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+};
+
+// Tirage pondéré : les bagues du trait dominant sont fortement favorisées
+const pickRingByTrait = (rings, trait) => {
+  if (!rings || rings.length === 0) return null;
+  const mainWeight = 4;
+  const otherWeight = 1;
+  const totalWeight = rings.reduce(
+    (sum, r) => sum + (RING_TRAITS[r.id] === trait ? mainWeight : otherWeight),
+    0
+  );
+  let roll = Math.random() * totalWeight;
+  for (const ring of rings) {
+    roll -= RING_TRAITS[ring.id] === trait ? mainWeight : otherWeight;
+    if (roll <= 0) return ring;
+  }
+  return rings[rings.length - 1];
+};
+
 export default function App() {
   const [step, setStep] = useState('cover');
   const [playerName, setPlayerName] = useState('');
@@ -203,6 +257,7 @@ export default function App() {
   const sealHoldInterval = useRef(null);
   const sealDecayInterval = useRef(null);
   const sealRumbleRef = useRef(null);
+  const rouletteLaunchedRef = useRef(false);
 
   // Visibilité du Cercle des Détenteurs, pilotée depuis le panneau admin (masquée par défaut)
   const [isGalleryEnabled, setIsGalleryEnabled] = useState(false);
@@ -210,10 +265,17 @@ export default function App() {
   // Écran de monitoring public en direct des attributions de bagues
   const [monitorRings, setMonitorRings] = useState([]);
   const [revealRing, setRevealRing] = useState(null);
+  const [hoveredMonitorIndex, setHoveredMonitorIndex] = useState(null);
   const revealQueueRef = useRef([]);
   const isRevealingRef = useRef(false);
   const prevMonitorRingsRef = useRef(null);
   const monitorUnsubRef = useRef(null);
+
+  // Blocage d'une seconde tentative de rituel, persistant même après rafraîchissement
+  const [deviceId] = useState(getOrCreateDeviceId);
+  const [isBlockedFromRetry, setIsBlockedFromRetry] = useState(false);
+  const [blockedPlayInfo, setBlockedPlayInfo] = useState(null);
+  const [playsList, setPlaysList] = useState([]);
 
   const fetchRings = async () => {
     try {
@@ -249,6 +311,79 @@ export default function App() {
     } catch (e) {
       console.error("Erreur mise à jour des réglages du Cercle des Détenteurs:", e);
       setIsGalleryEnabled(!nextValue);
+    }
+  };
+
+  const fetchPlayStatus = async (id) => {
+    try {
+      const playSnap = await getDoc(doc(db, 'plays', id));
+      if (playSnap.exists()) {
+        const data = playSnap.data();
+        if (data.blocked !== false) {
+          setIsBlockedFromRetry(true);
+          setBlockedPlayInfo(data);
+        }
+      }
+    } catch (e) {
+      console.error("Erreur vérification du statut de rituel:", e);
+    }
+  };
+
+  const fetchPlaysList = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'plays'));
+      const list = [];
+      querySnapshot.forEach((docSnap) => list.push({ id: docSnap.id, ...docSnap.data() }));
+      list.sort((a, b) => (b.playedAt || '').localeCompare(a.playedAt || ''));
+      setPlaysList(list);
+    } catch (e) {
+      console.error("Erreur chargement des tentatives:", e);
+    }
+  };
+
+  const allowPlayerRetry = async (playId) => {
+    try {
+      await updateDoc(doc(db, 'plays', playId), { blocked: false });
+      await fetchPlaysList();
+      if (playId === deviceId) {
+        setIsBlockedFromRetry(false);
+        setBlockedPlayInfo(null);
+      }
+    } catch (e) {
+      console.error("Erreur autorisation de nouvelle tentative:", e);
+    }
+  };
+
+  const relockPlayer = async (playId) => {
+    try {
+      await updateDoc(doc(db, 'plays', playId), { blocked: true });
+      await fetchPlaysList();
+    } catch (e) {
+      console.error("Erreur reverrouillage:", e);
+    }
+  };
+
+  const deletePlayRecord = async (playId) => {
+    if (!window.confirm("Supprimer définitivement cette trace de tentative ?")) return;
+    try {
+      await deleteDoc(doc(db, 'plays', playId));
+      await fetchPlaysList();
+    } catch (e) {
+      console.error("Erreur suppression de la trace:", e);
+    }
+  };
+
+  const removeHolder = async (ring) => {
+    if (!ring.assignedTo) return;
+    if (!window.confirm(`Retirer simplement ${ring.assignedTo} de cette bague (sans le déclarer déchu) ?`)) return;
+    playSound('click');
+    try {
+      const ringRef = doc(db, 'rings', ring.id);
+      const newHistory = (ring.history || []).filter(h => h !== ring.assignedTo);
+      await updateDoc(ringRef, { assignedTo: null, history: newHistory });
+      await fetchRings();
+    } catch (error) {
+      console.error("Erreur lors du retrait du porteur:", error);
     }
   };
 
@@ -292,6 +427,7 @@ export default function App() {
   useEffect(() => {
     fetchRings();
     fetchGallerySettings();
+    fetchPlayStatus(deviceId);
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap';
     link.rel = 'stylesheet';
@@ -350,6 +486,7 @@ export default function App() {
   };
 
   const handleOpenNameInput = () => {
+    if (isBlockedFromRetry) return;
     playSound('click');
     if (audioRef.current && !isMusicPlaying) {
       audioRef.current.play().then(() => {
@@ -363,6 +500,7 @@ export default function App() {
     e.preventDefault();
     if (!playerName.trim()) return;
     playSound('click');
+    rouletteLaunchedRef.current = false;
     if (availableRings.length === 0) {
       setStep('finished');
       setTimeout(() => setIsResultFadingIn(true), 50);
@@ -428,26 +566,34 @@ export default function App() {
     }
     setIsSealHolding(true);
     startSealRumble();
+
+    let localProgress = sealProgress;
+    let hasFinished = false;
+
     sealHoldInterval.current = setInterval(() => {
-      setSealProgress((prev) => {
-        const next = Math.min(prev + 2.2, 100);
-        updateSealRumble(next);
-        if (Math.floor(next / 14) > Math.floor(prev / 14)) {
-          playSound('seal');
-          if (navigator.vibrate) navigator.vibrate(8);
-        }
-        if (next >= 100) {
-          clearInterval(sealHoldInterval.current);
-          sealHoldInterval.current = null;
-          setIsSealHolding(false);
-          setIsSealBroken(true);
-          stopSealRumble(true);
-          playSound('boom');
-          if (navigator.vibrate) navigator.vibrate([25, 30, 55]);
-          setTimeout(() => startRoulette(pendingAnswers), 950);
-        }
-        return next;
-      });
+      if (hasFinished) return;
+      const prev = localProgress;
+      const next = Math.min(prev + 2.2, 100);
+      localProgress = next;
+      setSealProgress(next);
+      updateSealRumble(next);
+
+      if (Math.floor(next / 14) > Math.floor(prev / 14)) {
+        playSound('seal');
+        if (navigator.vibrate) navigator.vibrate(8);
+      }
+
+      if (next >= 100) {
+        hasFinished = true;
+        clearInterval(sealHoldInterval.current);
+        sealHoldInterval.current = null;
+        setIsSealHolding(false);
+        setIsSealBroken(true);
+        stopSealRumble(true);
+        playSound('boom');
+        if (navigator.vibrate) navigator.vibrate([25, 30, 55]);
+        setTimeout(() => startRoulette(pendingAnswers), 950);
+      }
     }, 35);
   };
 
@@ -459,15 +605,17 @@ export default function App() {
     setIsSealHolding(false);
     if (!isSealBroken) {
       stopSealRumble(false);
+
+      let localProgress = sealProgress;
+
       sealDecayInterval.current = setInterval(() => {
-        setSealProgress((prev) => {
-          const next = Math.max(prev - 3, 0);
-          if (next <= 0 && sealDecayInterval.current) {
-            clearInterval(sealDecayInterval.current);
-            sealDecayInterval.current = null;
-          }
-          return next;
-        });
+        const next = Math.max(localProgress - 3, 0);
+        localProgress = next;
+        setSealProgress(next);
+        if (next <= 0 && sealDecayInterval.current) {
+          clearInterval(sealDecayInterval.current);
+          sealDecayInterval.current = null;
+        }
       }, 30);
     }
   };
@@ -508,6 +656,9 @@ export default function App() {
   };
 
   const startRoulette = (finalAnswers) => {
+    if (rouletteLaunchedRef.current) return;
+    rouletteLaunchedRef.current = true;
+
     setStep('roulette');
     setIsRouletteFadingIn(false);
     setRouletteCounter(0);
@@ -516,7 +667,7 @@ export default function App() {
     setTimeout(() => setIsRouletteFadingIn(true), 50);
     setIsRolling(true);
 
-    const selected = availableRings[Math.floor(Math.random() * availableRings.length)];
+    const selected = pickRingByTrait(availableRings, getDominantTrait(finalAnswers));
 
     let counter = 0;
     const interval = setInterval(() => {
@@ -534,14 +685,14 @@ export default function App() {
         setTimeout(() => finalizeRingAssignment(finalAnswers, selected), 1900);
       } else {
         playSound('roulette');
-        const randomRing = availableRings[Math.floor(Math.random() * availableRings.length)];
+        const randomRing = pickRingByTrait(availableRings, getDominantTrait(finalAnswers));
         setRollingText(`${randomRing.kanji} — ${randomRing.name}`);
       }
     }, 70);
   };
 
   const finalizeRingAssignment = (finalAnswers, preSelectedRing) => {
-    const selected = preSelectedRing || availableRings[Math.floor(Math.random() * availableRings.length)];
+    const selected = preSelectedRing || pickRingByTrait(availableRings, getDominantTrait(finalAnswers || answers));
     
     setAssignedRing(selected);
     setIsRolling(false);
@@ -557,6 +708,18 @@ export default function App() {
         history: arrayUnion(playerName)
       });
       fetchRings();
+
+      setDoc(doc(db, 'plays', deviceId), {
+        playerName,
+        ringId: selected.id,
+        ringKanji: selected.kanji,
+        ringName: selected.name,
+        playedAt: new Date().toISOString(),
+        blocked: true
+      }).then(() => {
+        setIsBlockedFromRetry(true);
+        setBlockedPlayInfo({ playerName, ringId: selected.id, ringKanji: selected.kanji, ringName: selected.name });
+      }).catch((e) => console.error("Erreur enregistrement de la tentative:", e));
     } catch (error) {
       console.error("Erreur attribution:", error);
     }
@@ -568,13 +731,14 @@ export default function App() {
     if (adminPassword === "akatsuki2026") {
       setAdminError(false);
       setStep('admin-dashboard');
+      fetchPlaysList();
     } else {
       setAdminError(true);
     }
   };
 
   const resetAllRings = async () => {
-    if (!window.confirm("Libérer toutes les bagues et effacer l'historique des joueurs ?")) return;
+    if (!window.confirm("Libérer toutes les bagues, effacer l'historique des joueurs ET débloquer toutes les tentatives ?")) return;
     try {
       for (const ring of allRings) {
         const ringRef = doc(db, 'rings', ring.id);
@@ -583,8 +747,14 @@ export default function App() {
           history: [ring.owner] 
         });
       }
+      for (const play of playsList) {
+        await deleteDoc(doc(db, 'plays', play.id));
+      }
       await fetchRings();
-      alert("Toutes les bagues ont été réinitialisées.");
+      await fetchPlaysList();
+      setIsBlockedFromRetry(false);
+      setBlockedPlayInfo(null);
+      alert("Toutes les bagues et tentatives ont été réinitialisées.");
     } catch (error) {
       console.error(error);
     }
@@ -696,35 +866,6 @@ export default function App() {
         >
           <AkatsukiCloud style={{ width: '16px', height: 'auto' }} />
           Cercle des Détenteurs
-        </button>
-      )}
-
-      {/* Bouton de suivi en direct positionné en bas à gauche, symétrique au système de son */}
-      {step === 'cover' && (
-        <button
-          onClick={openMonitor}
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '20px',
-            background: 'rgba(5, 5, 7, 0.85)',
-            border: '1px solid rgba(82, 82, 91, 0.4)',
-            color: '#a1a1aa',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            fontSize: '10px',
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-            cursor: 'pointer',
-            zIndex: 10,
-            backdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'freeRingPulse 1.6s ease-in-out infinite' }} />
-          Suivi en direct
         </button>
       )}
 
@@ -984,10 +1125,9 @@ export default function App() {
           display: 'flex',
           flexDirection: 'column',
           padding: '20px',
-          boxSizing: 'border-box',
-          overflowY: 'auto'
+          boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexShrink: 0 }}>
             <button
               onClick={() => { playSound('click'); window.location.hash = ''; setStep('cover'); }}
               style={{ background: 'transparent', border: 'none', color: '#a1a1aa', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', cursor: 'pointer' }}
@@ -999,50 +1139,56 @@ export default function App() {
               <h2 style={{ color: '#ef4444', fontSize: '18px', fontFamily: '"Yuji Boku", serif', letterSpacing: '3px', margin: 0 }}>
                 Suivi en Direct
               </h2>
+              <span style={{ color: '#71717a', fontSize: '10px', letterSpacing: '1px' }}>
+                ({monitorRings.filter(r => r.assignedTo).length}/{monitorRings.length})
+              </span>
             </div>
             <div style={{ width: '70px' }}></div>
           </div>
 
-          <p style={{ textAlign: 'center', color: '#71717a', fontSize: '11px', letterSpacing: '1px', margin: '0 0 22px 0' }}>
-            {monitorRings.filter(r => r.assignedTo).length} / {monitorRings.length} bagues attribuées
-          </p>
-
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: '12px',
-            maxWidth: '900px',
+            display: 'flex',
+            flexDirection: 'row',
+            flex: 1,
+            gap: '8px',
             width: '100%',
-            margin: '0 auto'
+            height: 'calc(100vh - 70px)',
+            overflow: 'hidden'
           }}>
-            {monitorRings.map((ring) => {
+            {monitorRings.map((ring, index) => {
               const isFree = !ring.assignedTo;
               const isJustRevealed = revealRing?.id === ring.id;
+              const isHovered = hoveredMonitorIndex === index;
               return (
-                <div key={ring.id} style={{
-                  position: 'relative',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  aspectRatio: '3 / 4',
-                  border: `1px solid ${isJustRevealed ? '#ef4444' : isFree ? 'rgba(82, 82, 91, 0.4)' : 'rgba(239, 68, 68, 0.25)'}`,
-                  borderStyle: isFree ? 'dashed' : 'solid',
-                  boxShadow: isJustRevealed ? '0 0 30px rgba(239,68,68,0.6)' : 'none',
-                  transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
-                  backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  filter: isFree ? 'grayscale(0.75) brightness(0.5)' : 'none'
-                }}>
+                <div
+                  key={ring.id}
+                  onMouseEnter={() => setHoveredMonitorIndex(index)}
+                  onMouseLeave={() => setHoveredMonitorIndex(null)}
+                  style={{
+                    position: 'relative',
+                    flex: isHovered ? '2.2 0 0%' : '1',
+                    height: '100%',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    border: `1px solid ${isJustRevealed ? '#ef4444' : isFree ? 'rgba(82, 82, 91, 0.4)' : 'rgba(239, 68, 68, 0.25)'}`,
+                    borderStyle: isFree ? 'dashed' : 'solid',
+                    boxShadow: isJustRevealed ? '0 0 30px rgba(239,68,68,0.6)' : isHovered ? '0 0 20px rgba(239, 68, 68, 0.2)' : 'none',
+                    transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s ease, box-shadow 0.4s ease',
+                    backgroundImage: `url("${import.meta.env.BASE_URL}characters/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: isFree ? 'grayscale(0.75) brightness(0.5)' : 'none'
+                  }}>
                   <div style={{
                     position: 'absolute', inset: 0,
                     background: 'linear-gradient(to top, rgba(5,5,7,0.95) 20%, rgba(5,5,7,0.25))',
                     display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center',
-                    padding: '10px 6px', textAlign: 'center', gap: '2px'
+                    padding: '20px 6px', textAlign: 'center', gap: '3px'
                   }}>
-                    <span style={{ color: isFree ? '#a1a1aa' : '#ef4444', fontSize: '18px', fontFamily: '"Yuji Boku", serif', textShadow: isFree ? 'none' : '0 0 8px rgba(239,68,68,0.5)' }}>
+                    <span style={{ color: isFree ? '#a1a1aa' : '#ef4444', fontSize: 'clamp(16px, 2vw, 24px)', fontFamily: '"Yuji Boku", serif', textShadow: isFree ? 'none' : '0 0 8px rgba(239,68,68,0.5)' }}>
                       {ring.kanji}
                     </span>
-                    <span style={{ color: '#e4e4e7', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.75 }}>
+                    <span style={{ color: '#e4e4e7', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.75, whiteSpace: 'nowrap' }}>
                       {ring.name}
                     </span>
                     {isFree ? (
@@ -1114,16 +1260,30 @@ export default function App() {
         {step === 'cover' && (
           <div 
             onClick={handleOpenNameInput}
-            style={{ textAlign: 'center', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', width: '100%', padding: '40px' }}
+            style={{ textAlign: 'center', cursor: isBlockedFromRetry ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', width: '100%', padding: '40px' }}
           >
             <AkatsukiCloud style={{
               width: 'clamp(90px, 22vw, 130px)', height: 'auto',
-              filter: 'drop-shadow(0 0 22px rgba(239, 68, 68, 0.5))',
-              animation: 'coverCloudBreathe 4s ease-in-out infinite'
+              filter: `drop-shadow(0 0 22px rgba(239, 68, 68, ${isBlockedFromRetry ? 0.25 : 0.5}))`,
+              opacity: isBlockedFromRetry ? 0.5 : 1,
+              animation: isBlockedFromRetry ? 'none' : 'coverCloudBreathe 4s ease-in-out infinite'
             }} />
-            <div style={{ color: '#a1a1aa', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '4px', opacity: 0.8, fontWeight: '500' }}>
-              Toucher pour éveiller le rituel
-            </div>
+            {isBlockedFromRetry ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '340px' }}>
+                <div style={{ color: '#a1a1aa', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '3px', opacity: 0.8, fontWeight: '500' }}>
+                  Le rituel a déjà été accompli
+                </div>
+                {blockedPlayInfo && (
+                  <p style={{ color: '#71717a', fontSize: '12px', lineHeight: '1.6', margin: 0, fontStyle: 'italic' }}>
+                    {blockedPlayInfo.playerName}, ta bague — {blockedPlayInfo.ringKanji} {blockedPlayInfo.ringName} — t'attend déjà dans le Cercle.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: '#a1a1aa', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '4px', opacity: 0.8, fontWeight: '500' }}>
+                Toucher pour éveiller le rituel
+              </div>
+            )}
           </div>
         )}
 
@@ -1632,6 +1792,59 @@ export default function App() {
               </button>
             </div>
 
+            <button
+              onClick={() => { playSound('click'); window.location.hash = 'monitor'; setStep('monitor'); }}
+              style={{
+                background: '#050507', border: '1px solid #1f1f23', color: '#a1a1aa',
+                padding: '10px 14px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}
+            >
+              <span>📡 Ouvrir l'écran de suivi en direct</span>
+              <span style={{ color: '#52525b' }}>→</span>
+            </button>
+
+            <div style={{ background: '#050507', borderRadius: '6px', border: '1px solid #1f1f23', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ color: '#e4e4e7', fontSize: '12px', fontWeight: '600' }}>
+                Tentatives de rituel ({playsList.length})
+              </span>
+              <span style={{ color: '#71717a', fontSize: '10px', marginTop: '-4px' }}>
+                Chaque appareil ne peut faire le rituel qu'une fois. Débloque une entrée pour autoriser une nouvelle tentative depuis cet appareil.
+              </span>
+              {playsList.length === 0 ? (
+                <span style={{ color: '#52525b', fontSize: '10px', fontStyle: 'italic' }}>Aucune tentative enregistrée pour le moment.</span>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {playsList.map((play) => (
+                    <div key={play.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0a0a0c', border: '1px solid #1f1f23', borderRadius: '4px', padding: '6px 8px', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                        <span style={{ color: '#e4e4e7', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {play.playerName}
+                        </span>
+                        <span style={{ color: '#71717a', fontSize: '9px' }}>
+                          {play.ringKanji} {play.ringName} · {play.blocked === false ? 'Débloqué' : 'Verrouillé'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                        {play.blocked === false ? (
+                          <button onClick={() => relockPlayer(play.id)} style={{ background: '#18181b', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '4px 7px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer' }}>
+                            Reverrouiller
+                          </button>
+                        ) : (
+                          <button onClick={() => allowPlayerRetry(play.id)} style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid #ef4444', padding: '4px 7px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
+                            Autoriser à retenter
+                          </button>
+                        )}
+                        <button onClick={() => deletePlayRecord(play.id)} style={{ background: 'transparent', color: '#52525b', border: '1px solid #27272a', padding: '4px 7px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer' }}>
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
               {allRings.map((ring) => (
                 <div key={ring.id} style={{ background: '#050507', padding: '12px', borderRadius: '6px', border: '1px solid #1f1f23', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1714,9 +1927,14 @@ export default function App() {
                         }} style={{ background: '#18181b', color: '#e4e4e7', border: '1px solid #27272a', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>Modifier</button>
                         
                         {ring.assignedTo ? (
-                          <button onClick={() => declareFallenAndRelease(ring.id, ring.assignedTo)} style={{ background: 'rgba(185, 28, 28, 0.3)', color: '#fca5a5', border: '1px solid #ef4444', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
-                            Déclarer Déchu/Mort ☠️
-                          </button>
+                          <>
+                            <button onClick={() => declareFallenAndRelease(ring.id, ring.assignedTo)} style={{ background: 'rgba(185, 28, 28, 0.3)', color: '#fca5a5', border: '1px solid #ef4444', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', cursor: 'pointer' }}>
+                              Déclarer Déchu/Mort ☠️
+                            </button>
+                            <button onClick={() => removeHolder(ring)} style={{ background: '#18181b', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer' }}>
+                              Retirer simplement
+                            </button>
+                          </>
                         ) : (
                           <span style={{ fontSize: '9px', color: '#52525b', padding: '4px' }}>Déjà disponible</span>
                         )}
@@ -1742,4 +1960,3 @@ export default function App() {
     </div>
   );
 }
-
