@@ -1170,7 +1170,7 @@ export default function Test() {
                             )}
                             {ring.owner && ring.owner !== activeHolder && (
                               <p style={{ color: '#a1a1aa', fontSize: '11px', fontStyle: 'italic', margin: 0, opacity: 0.9, letterSpacing: '0.5px' }}>
-                                Porteur initial originel : <span style={{ color: '#d4d4d8' }}>{ring.owner}</span>
+                                Porteur originel : <span style={{ color: '#d4d4d8' }}>{ring.owner}</span>
                               </p>
                             )}
                           </div>
@@ -1195,7 +1195,7 @@ export default function Test() {
                               }}>
                                 <span style={{ fontWeight: idx === 0 ? '600' : 'normal' }}>{person}</span>
                                 <span style={{ fontSize: '9px', color: '#71717a', fontFamily: 'monospace' }}>
-                                  {idx === 0 ? 'Porteur initial' : `Génération ${idx + 1}`}
+                                  {idx === 0 ? 'Porteur originel' : `Successeur ${idx + 1}`}
                                 </span>
                               </div>
                             ))}
@@ -1410,7 +1410,7 @@ export default function Test() {
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="votre nom..."
+              placeholder="Ton nom."
               autoFocus
               required
               style={{ 
@@ -1571,7 +1571,7 @@ export default function Test() {
               color: '#52525b', fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'monospace',
               opacity: isSealBroken ? 0 : 1, transition: 'opacity 0.3s ease'
             }}>
-              {sealProgress < 100 ? 'Presser et maintenir' : 'Sceau rompu'}
+              {sealProgress < 100 ? 'Maintiens le sceau' : 'Sceau brisé'}
             </span>
           </div>
         )}
@@ -1755,7 +1755,7 @@ export default function Test() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '480px', width: '100%' }}>
               <div style={{ borderBottom: '1px solid rgba(82, 82, 91, 0.3)', paddingBottom: '8px' }}>
-                <span style={{ fontSize: '10px', color: '#71717a', textTransform: 'uppercase', fontFamily: 'monospace', display: 'block', letterSpacing: '2px' }}>Position & Porteur</span>
+                <span style={{ fontSize: '10px', color: '#71717a', textTransform: 'uppercase', fontFamily: 'monospace', display: 'block', letterSpacing: '2px' }}>Doigt & Porteur</span>
                 <p style={{ color: '#e4e4e7', fontSize: '14px', margin: '4px 0 0 0', fontWeight: '400' }}>
                   {assignedRing.finger} — <span style={{ color: '#f87171' }}>{assignedRing.owner}</span>
                 </p>
@@ -2041,7 +2041,7 @@ export default function Test() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxWidth: '65%' }}>
                         <span style={{ fontWeight: '600', color: '#f87171', fontSize: '13px' }}>{ring.kanji} {ring.name}</span>
-                        <span style={{ color: '#a1a1aa', fontSize: '10px' }}>Porteur initial : <span style={{ color: '#e4e4e7' }}>{ring.owner}</span></span>
+                        <span style={{ color: '#a1a1aa', fontSize: '10px' }}>Porteur originel : <span style={{ color: '#e4e4e7' }}>{ring.owner}</span></span>
                         
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
                           <span style={{ fontSize: '9px', color: '#71717a', alignSelf: 'center' }}>Lignage :</span>
@@ -2158,7 +2158,8 @@ export default function Test() {
       </div>
 
       <footer style={{ textAlign: 'center', fontSize: '8px', color: '#27272a', fontFamily: 'monospace', zIndex: '2', letterSpacing: '1px' }}>
-        <span>Akatsuki Systeme - Admin panel</span> — <button onClick={() => setStep('admin-login')} style={{ background: 'none', border: 'none', color: '#27272a', textDecoration: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>.</button>
+        <span>Akatsuki Legacy</span>
+        <button onClick={() => setStep('admin-login')} style={{ background: 'none', border: 'none', color: 'transparent', cursor: 'pointer', padding: 0, marginLeft: '8px', font: 'inherit' }}>·</button>
       </footer>
 
     </div>
