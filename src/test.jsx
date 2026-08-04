@@ -262,6 +262,10 @@ export default function Test() {
   // Visibilité du Cercle des Détenteurs, pilotée depuis le panneau admin (masquée par défaut)
   const [isGalleryEnabled, setIsGalleryEnabled] = useState(false);
 
+  // Images des personnages : activation globale + validation par l'admin
+  const [isImagesEnabled, setIsImagesEnabled] = useState(false);
+  const [imageInputs, setImageInputs] = useState({});
+
   // Détection d'écran mobile pour adapter l'affichage du Cercle des Détenteurs
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 820);
 
@@ -321,6 +325,63 @@ export default function Test() {
       console.error("Erreur mise à jour des réglages du Cercle des Détenteurs:", e);
       setIsGalleryEnabled(!nextValue);
     }
+  };
+
+  const isValidImageUrl = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url.trim());
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const fetchImagesSettings = async () => {
+    try {
+      const settingsSnap = await getDoc(doc(db, 'settings', 'images'));
+      setIsImagesEnabled(settingsSnap.exists() ? !!settingsSnap.data().enabled : false);
+    } catch (e) {
+      console.error("Erreur chargement des réglages des images:", e);
+    }
+  };
+
+  const toggleImagesEnabled = async () => {
+    const nextValue = !isImagesEnabled;
+    setIsImagesEnabled(nextValue);
+    try {
+      await setDoc(doc(db, 'settings', 'images'), { enabled: nextValue }, { merge: true });
+    } catch (e) {
+      console.error("Erreur mise à jour des réglages des images:", e);
+      setIsImagesEnabled(!nextValue);
+    }
+  };
+
+  const validateRingImage = async (ringId) => {
+    const url = (imageInputs[ringId] || '').trim();
+    if (!isValidImageUrl(url)) return;
+    try {
+      await updateDoc(doc(db, 'rings', ringId), { imageUrl: url, imageValidated: true });
+      await fetchRings();
+    } catch (e) {
+      console.error("Erreur validation de l'image:", e);
+    }
+  };
+
+  const removeRingImage = async (ringId) => {
+    try {
+      await updateDoc(doc(db, 'rings', ringId), { imageUrl: '', imageValidated: false });
+      await fetchRings();
+    } catch (e) {
+      console.error("Erreur retrait de l'image:", e);
+    }
+  };
+
+  const getRingBackground = (ring) => {
+    if (isImagesEnabled && ring.imageValidated && ring.imageUrl) {
+      return `url("${ring.imageUrl}")`;
+    }
+    return `url("${import.meta.env.BASE_URL}charactersTest/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`;
   };
 
   const fetchPlayStatus = async (id) => {
@@ -436,6 +497,7 @@ export default function Test() {
   useEffect(() => {
     fetchRings();
     fetchGallerySettings();
+    fetchImagesSettings();
     fetchPlayStatus(deviceId);
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap';
@@ -994,7 +1056,7 @@ export default function Test() {
                     position: 'relative',
                     width: isMobile ? (isMobileSelected ? '100%' : '120px') : (isSelected ? '45%' : '100%'),
                     height: isMobile ? (isMobileSelected ? '200px' : '100%') : '100%',
-                    backgroundImage: `url("${import.meta.env.BASE_URL}charactersTest/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
+                    backgroundImage: getRingBackground(ring),
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     filter: isFree && !isSelected ? 'grayscale(0.75) brightness(0.55)' : 'none',
@@ -1228,7 +1290,7 @@ export default function Test() {
                     borderStyle: isFree ? 'dashed' : 'solid',
                     boxShadow: isJustRevealed ? '0 0 30px rgba(239,68,68,0.6)' : isHovered ? '0 0 20px rgba(239, 68, 68, 0.2)' : 'none',
                     transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s ease, box-shadow 0.4s ease',
-                    backgroundImage: `url("${import.meta.env.BASE_URL}charactersTest/${ring.id}.jpg"), url("${import.meta.env.BASE_URL}background.jpg")`,
+                    backgroundImage: getRingBackground(ring),
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     filter: isFree ? 'grayscale(0.75) brightness(0.5)' : 'none'
@@ -1846,6 +1908,38 @@ export default function Test() {
               </button>
             </div>
 
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: '#050507', padding: '12px 14px', borderRadius: '6px', border: '1px solid #1f1f23'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ color: '#e4e4e7', fontSize: '12px', fontWeight: '600' }}>
+                  Images des personnages
+                </span>
+                <span style={{ color: '#71717a', fontSize: '10px' }}>
+                  {isImagesEnabled ? 'Activées — les visuels validés s\'affichent dans le Cercle' : 'Désactivées — les personnages restent en silhouette'}
+                </span>
+              </div>
+              <button
+                onClick={toggleImagesEnabled}
+                aria-label="Basculer l'affichage des images des personnages"
+                style={{
+                  width: '46px', height: '26px', borderRadius: '13px', position: 'relative', flexShrink: 0,
+                  border: `1px solid ${isImagesEnabled ? '#16a34a' : '#3f3f46'}`,
+                  background: isImagesEnabled ? 'rgba(22, 163, 74, 0.35)' : 'rgba(63, 63, 70, 0.3)',
+                  cursor: 'pointer', transition: 'all 0.25s ease'
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: '2px', left: isImagesEnabled ? '22px' : '2px',
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  background: isImagesEnabled ? '#16a34a' : '#71717a',
+                  boxShadow: isImagesEnabled ? '0 0 8px rgba(22,163,74,0.7)' : 'none',
+                  transition: 'left 0.25s ease, background 0.25s ease'
+                }} />
+              </button>
+            </div>
+
             <button
               onClick={() => { playSound('click'); window.location.hash = 'monitor'; setStep('monitor'); }}
               style={{
@@ -1991,6 +2085,62 @@ export default function Test() {
                           </>
                         ) : (
                           <span style={{ fontSize: '9px', color: '#52525b', padding: '4px' }}>Déjà disponible</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {editingRingId !== ring.id && (
+                    <div style={{ borderTop: '1px solid #1f1f23', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#71717a', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'monospace' }}>
+                          Image du Cercle
+                        </span>
+                        <span style={{ fontSize: '9px', fontWeight: 'bold', color: ring.imageValidated && ring.imageUrl ? '#4ade80' : '#a1a1aa' }}>
+                          {ring.imageValidated && ring.imageUrl
+                            ? 'Validée ✓'
+                            : (imageInputs[ring.id] || ring.imageUrl)
+                              ? 'En attente de validation'
+                              : 'Aucune'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={imageInputs[ring.id] !== undefined ? imageInputs[ring.id] : (ring.imageUrl || '')}
+                          onChange={(e) => setImageInputs(prev => ({ ...prev, [ring.id]: e.target.value }))}
+                          placeholder="https://.../image.jpg"
+                          style={{ flex: 1, padding: '6px', fontSize: '10px', background: '#0a0a0c', color: '#fff', border: '1px solid #27272a', borderRadius: '4px', fontFamily: 'monospace' }}
+                        />
+                        {(imageInputs[ring.id] || ring.imageUrl) && (
+                          <div style={{
+                            width: '34px', height: '34px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0,
+                            border: '1px solid #27272a', background: '#0a0a0c',
+                            backgroundImage: `url("${(imageInputs[ring.id] !== undefined ? imageInputs[ring.id] : ring.imageUrl) || ''}")`,
+                            backgroundSize: 'cover', backgroundPosition: 'center'
+                          }} />
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          onClick={() => validateRingImage(ring.id)}
+                          disabled={!isValidImageUrl(imageInputs[ring.id])}
+                          style={{
+                            background: 'rgba(22, 163, 74, 0.2)', color: '#86efac', border: '1px solid #16a34a',
+                            padding: '4px 10px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold',
+                            cursor: isValidImageUrl(imageInputs[ring.id]) ? 'pointer' : 'not-allowed',
+                            opacity: isValidImageUrl(imageInputs[ring.id]) ? 1 : 0.4
+                          }}
+                        >
+                          ✓ Valider l'image
+                        </button>
+                        {(ring.imageUrl || ring.imageValidated) && (
+                          <button
+                            onClick={() => removeRingImage(ring.id)}
+                            style={{ background: 'transparent', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '4px 10px', borderRadius: '4px', fontSize: '9px', cursor: 'pointer' }}
+                          >
+                            Retirer
+                          </button>
                         )}
                       </div>
                     </div>
