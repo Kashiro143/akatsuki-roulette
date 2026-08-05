@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 // Configuration de votre base de données de test
 const firebaseConfig = {
@@ -14,6 +15,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const ringsData = {
   zero: {
@@ -99,6 +101,14 @@ const ringsData = {
 };
 
 async function seedDatabase() {
+  const email = process.env.AKATSUKI_ADMIN_EMAIL;
+  const password = process.env.AKATSUKI_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.error("Définissez AKATSUKI_ADMIN_EMAIL et AKATSUKI_ADMIN_PASSWORD (compte leader du projet de test).");
+    process.exit(1);
+  }
+  console.log("Connexion du leader au projet de test...");
+  await signInWithEmailAndPassword(auth, email, password);
   console.log("Injection des bagues dans Firestore (Environnement de test)...");
   try {
     for (const [id, data] of Object.entries(ringsData)) {

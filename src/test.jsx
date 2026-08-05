@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, updateDoc, arrayUnion, getDoc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 // Identifiant d'appareil persistant (localStorage), utilisé pour bloquer une seconde tentative de rituel
 const getOrCreateDeviceId = () => {
@@ -30,6 +31,21 @@ const firebaseConfig = {
 
 const testApp = initializeApp(firebaseConfig, "testApp");
 const db = getFirestore(testApp);
+const auth = getAuth(testApp);
+
+// Adresse email autorisée à piloter le panneau leader (à aligner avec firestore.rules)
+const ADMIN_EMAILS = ['leader@akatsuki.legacy'];
+
+// Les joueurs sont identifiés anonymement pour respecter les règles Firestore
+const ensureAnonymousAuth = async () => {
+  try {
+    if (!auth.currentUser) {
+      await signInAnonymously(auth);
+    }
+  } catch (e) {
+    console.error("Erreur authentification anonyme:", e);
+  }
+};
 
 // Synthèse sonore organique et mystique (esprit Akatsuki / sceau de chakra)
 const playSound = (type) => {
@@ -246,6 +262,8 @@ export default function Test() {
   const audioRef = useRef(null);
   
   const [adminPassword, setAdminPassword] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminBusy, setAdminBusy] = useState(false);
   const [adminError, setAdminError] = useState(false);
   const [editingRingId, setEditingRingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', kanji: '', owner: '', description: '', history: '' });
@@ -499,6 +517,7 @@ export default function Test() {
     fetchGallerySettings();
     fetchImagesSettings();
     fetchPlayStatus(deviceId);
+    ensureAnonymousAuth();
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap';
     link.rel = 'stylesheet';
@@ -796,16 +815,36 @@ export default function Test() {
     }
   };
 
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
     playSound('click');
-    if (adminPassword === "akatsuki2026") {
-      setAdminError(false);
+    setAdminError(false);
+    setAdminBusy(true);
+    try {
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        await signOut(auth);
+      }
+      const cred = await signInWithEmailAndPassword(auth, adminEmail.trim(), adminPassword);
+      if (!ADMIN_EMAILS.includes(cred.user.email)) {
+        setAdminError(true);
+        await signOut(auth);
+        await ensureAnonymousAuth();
+        return;
+      }
       setStep('admin-dashboard');
       fetchPlaysList();
-    } else {
+    } catch (err) {
+      console.error("Erreur connexion leader:", err);
       setAdminError(true);
+    } finally {
+      setAdminBusy(false);
     }
+  };
+
+  const handleAdminLogout = async () => {
+    try { await signOut(auth); } catch (e) { console.error("Erreur déconnexion:", e); }
+    await ensureAnonymousAuth();
+    setStep('cover');
   };
 
   const resetAllRings = async () => {
@@ -1849,21 +1888,33 @@ export default function Test() {
         {step === 'admin-login' && (
           <form onSubmit={handleAdminLogin} style={{ background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid #27272a', borderRadius: '12px', padding: '35px 25px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
             <h2 style={{ color: '#ef4444', fontSize: '14px', textTransform: 'uppercase', textAlign: 'center', margin: 0, letterSpacing: '1px' }}>Accès Leader</h2>
-            <div>
-              <label style={{ display: 'block', fontSize: '10px', fontFamily: 'monospace', color: '#a1a1aa', marginBottom: '6px', textTransform: 'uppercase' }}>Mot de passe</label>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="••••••••••••"
-                required
-                style={{ fontFamily: 'monospace', width: '100%', background: '#050507', border: '1px solid #27272a', padding: '8px', color: '#fff', borderRadius: '4px' }}
-              />
-              {adminError && <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0 0' }}>Accès refusé.</p>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontFamily: 'monospace', color: '#a1a1aa', marginBottom: '6px', textTransform: 'uppercase' }}>Email du leader</label>
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  required
+                  style={{ fontFamily: 'monospace', width: '100%', background: '#050507', border: '1px solid #27272a', padding: '8px', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontFamily: 'monospace', color: '#a1a1aa', marginBottom: '6px', textTransform: 'uppercase' }}>Mot de passe</label>
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  style={{ fontFamily: 'monospace', width: '100%', background: '#050507', border: '1px solid #27272a', padding: '8px', color: '#fff', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+              </div>
+              {adminError && <p style={{ color: '#ef4444', fontSize: '11px', margin: '4px 0 0 0' }}>Identifiants refusés.</p>}
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="button" onClick={() => setStep('cover')} style={{ width: '50%', background: '#18181b', color: '#fff', border: '1px solid #27272a', padding: '10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', cursor: 'pointer' }}>Retour</button>
-              <button type="submit" style={{ width: '50%', background: '#991b1b', color: '#fff', border: '1px solid #ef4444', padding: '10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', cursor: 'pointer' }}>Valider</button>
+              <button type="submit" disabled={adminBusy} style={{ width: '50%', background: '#991b1b', color: '#fff', border: '1px solid #ef4444', padding: '10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', cursor: adminBusy ? 'wait' : 'pointer' }}>{adminBusy ? 'Vérification…' : 'Valider'}</button>
             </div>
           </form>
         )}
@@ -1873,7 +1924,10 @@ export default function Test() {
           <div style={{ background: 'rgba(10, 10, 14, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid #27272a', borderRadius: '12px', padding: '25px', display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '520px', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ color: '#ef4444', fontSize: '14px', textTransform: 'uppercase', margin: 0, letterSpacing: '1px' }}>Panneau de Contrôle</h2>
-              <button onClick={() => setStep('cover')} style={{ background: 'none', border: 'none', color: '#a1a1aa', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer' }}>Quitter</button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button onClick={handleAdminLogout} style={{ background: 'none', border: 'none', color: '#71717a', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer' }}>Déconnexion</button>
+                <button onClick={() => setStep('cover')} style={{ background: 'none', border: 'none', color: '#a1a1aa', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer' }}>Quitter</button>
+              </div>
             </div>
 
             <div style={{
@@ -1951,6 +2005,32 @@ export default function Test() {
               <span>📡 Ouvrir l'écran de suivi en direct</span>
               <span style={{ color: '#52525b' }}>→</span>
             </button>
+
+            <div style={{ background: '#050507', borderRadius: '6px', border: '1px solid #1f1f23', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ color: '#e4e4e7', fontSize: '12px', fontWeight: '600' }}>
+                Lien public du suivi en direct
+              </span>
+              <span style={{ color: '#71717a', fontSize: '10px' }}>
+                Partage ce lien à la communauté : les membres voient les attributions en temps réel, sans pouvoir rien modifier.
+              </span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input
+                  readOnly
+                  value={`${window.location.origin}${window.location.pathname}#monitor`}
+                  onFocus={(e) => e.target.select()}
+                  style={{ flex: 1, padding: '6px', fontSize: '10px', background: '#0a0a0c', color: '#a1a1aa', border: '1px solid #27272a', borderRadius: '4px', fontFamily: 'monospace' }}
+                />
+                <button
+                  onClick={() => {
+                    try { navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#monitor`); }
+                    catch (e) { console.error("Erreur copie du lien:", e); }
+                  }}
+                  style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid #ef4444', padding: '6px 10px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  Copier
+                </button>
+              </div>
+            </div>
 
             <div style={{ background: '#050507', borderRadius: '6px', border: '1px solid #1f1f23', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <span style={{ color: '#e4e4e7', fontSize: '12px', fontWeight: '600' }}>

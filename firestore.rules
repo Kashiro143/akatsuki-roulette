@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Adresses email autorisées à piloter le panneau (à aligner avec ADMIN_EMAILS dans le code)
+    function isLeader() {
+      return isSignedIn()
+        && request.auth.token.email in ['leader@akatsuki.legacy'];
+    }
+
+    // Un joueur connecté peut uniquement réserver une bague libre
+    function isRingClaim() {
+      return isSignedIn()
+        && resource.data.assignedTo == null
+        && request.resource.data.assignedTo != null
+        && request.resource.data.assignedTo in request.resource.data.history
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedTo', 'history']);
+    }
+
+    match /rings/{ringId} {
+      allow read: if true;
+      allow create, delete: if isLeader();
+      allow update: if isLeader() || isRingClaim();
+    }
+
+    match /plays/{playId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.blocked == true
+        && request.resource.data.playedAt is string
+        && request.resource.data.playerName is string
+        && request.resource.data.ringId is string;
+      allow update, delete: if isLeader();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isLeader();
+    }
+  }
+}
